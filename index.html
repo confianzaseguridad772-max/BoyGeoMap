@@ -17,114 +17,117 @@
         .search-panel {
             position: absolute; top: 10px; left: 10px; z-index: 1000;
             background: white; padding: 15px; border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 280px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 300px;
         }
 
-        h2 { margin: 0 0 10px 0; font-size: 1.2em; color: #764ba2; border-bottom: 2px solid #f1f5f9; padding-bottom: 5px; }
-        label { font-size: 0.8em; font-weight: 600; color: #4a5568; }
-        input { width: 100%; padding: 8px; margin: 5px 0 15px 0; border: 1px solid #e2e8f0; border-radius: 6px; box-sizing: border-box; }
+        h2 { margin: 0 0 10px 0; font-size: 1.1em; color: #764ba2; border-bottom: 2px solid #f1f5f9; padding-bottom: 5px; }
+        label { font-size: 0.75em; font-weight: 600; color: #4a5568; display: block; margin-top: 10px; }
+        input { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #e2e8f0; border-radius: 6px; box-sizing: border-box; }
         
         .btn-filter { 
             width: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600;
+            color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 15px;
         }
 
-        .info-popup b { color: #764ba2; }
-        .child-tag { background: #f3f0ff; padding: 4px 8px; border-radius: 4px; display: block; margin-top: 5px; font-size: 0.9em; border-left: 3px solid #764ba2; }
+        .child-tag { background: #f3f0ff; padding: 6px 10px; border-radius: 6px; display: block; margin-top: 5px; font-size: 0.85em; border-left: 3px solid #764ba2; }
+        #stats { margin-top:12px; font-size: 0.8em; color: #718096; font-weight: 500; }
     </style>
 </head>
 <body>
 
 <div class="search-panel">
-    <h2><i class="fas fa-map-marked-alt"></i> Filtros</h2>
-    <label>Buscar por Nacimiento:</label>
-    <input type="date" id="filterDate">
-    <button class="btn-filter" onclick="loadMarkers()">Aplicar Filtro</button>
-    <div id="stats" style="margin-top:10px; font-size: 0.8em; color: #718096;"></div>
+    <h2><i class="fas fa-filter"></i> Rango de Nacimiento</h2>
+    
+    <label>Desde:</label>
+    <input type="date" id="dateStart">
+    
+    <label>Hasta:</label>
+    <input type="date" id="dateEnd">
+    
+    <button class="btn-filter" onclick="loadMarkers()">Filtrar Mapa</button>
+    <div id="stats">Cargando datos...</div>
 </div>
 
 <div id="map"></div>
 
 <script>
-    // Inicializar mapa en una coordenada central (Cerca de Castillo Grande/Tingo María)
     const map = L.map('map').setView([-9.2938, -75.9926], 14);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-    }).addTo(map);
-
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     let markersLayer = L.layerGroup().addTo(map);
 
-    // Función para calcular la edad exacta
+    // FUNCIÓN CRÍTICA: Convierte "DD/MM/AAAA" a un objeto Date real para comparar
+    function parseExcelDate(dateStr) {
+        if (!dateStr) return null;
+        const p = dateStr.split("/");
+        return new Date(p[2], p[1] - 1, p[0]); // Año, Mes(0-11), Día
+    }
+
     function calcularEdad(fechaStr) {
-        if (!fechaStr) return "S/D";
-        const partes = fechaStr.split("/");
-        const cumple = new Date(partes[2], partes[1] - 1, partes[0]);
+        const cumple = parseExcelDate(fechaStr);
+        if (!cumple) return "S/D";
         const hoy = new Date();
         let edad = hoy.getFullYear() - cumple.getFullYear();
-        const m = hoy.getMonth() - cumple.getMonth();
-        if (m < 0 || (m === 0 && hoy.getDate() < cumple.getDate())) edad--;
+        if (hoy.getMonth() < cumple.getMonth() || (hoy.getMonth() === cumple.getMonth() && hoy.getDate() < cumple.getDate())) edad--;
         return edad + " años";
     }
 
     async function loadMarkers() {
-        const selectedDate = document.getElementById('filterDate').value; // YYYY-MM-DD
-        markersLayer.clearLayers();
+        const startStr = document.getElementById('dateStart').value;
+        const endStr = document.getElementById('dateEnd').value;
         
-        // REEMPLAZA ESTA URL POR TU URL DE WEB APP DE GOOGLE
+        // Convertir filtros de input (YYYY-MM-DD) a objetos Date
+        const dStart = startStr ? new Date(startStr + "T00:00:00") : null;
+        const dEnd = endStr ? new Date(endStr + "T23:59:59") : null;
+
+        markersLayer.clearLayers();
+        document.getElementById('stats').innerText = "Buscando...";
+
+        // USA TU URL DE WEB APP AQUÍ
         const URL_API = "https://script.google.com/macros/s/AKfycbyXn_7STdNy6TtK0WsOKGSrWRWg-cN-btfuuJVI2mgI_J9HVHyPfkgl0Kt1-iJ4Cxk/exec";
 
         try {
             const response = await fetch(URL_API);
             const data = await response.json();
-            
-            // Agrupar por coordenadas para contar niños en el mismo punto
             const grupos = {};
+            let totalMatch = 0;
+
             data.forEach(item => {
-                const fNac = item.nacimientoHijo; // DD/MM/AAAA
+                const fechaHijo = parseExcelDate(item.nacimientoHijo);
                 
-                // Si hay filtro, verificar si coincide
-                if (selectedDate) {
-                    const fFiltro = selectedDate.split("-").reverse().join("/"); // DD/MM/YYYY
-                    if (fNac !== fFiltro) return;
-                }
+                // Lógica de filtrado por rango
+                if (dStart && fechaHijo < dStart) return;
+                if (dEnd && fechaHijo > dEnd) return;
 
                 if (!grupos[item.coords]) grupos[item.coords] = [];
                 grupos[item.coords].push(item);
+                totalMatch++;
             });
 
-            let totalNiños = 0;
-
-            // Crear marcadores
             for (const coord in grupos) {
                 const personas = grupos[coord];
                 const latlng = coord.split(",").map(Number);
                 
-                let content = `<div class="info-popup">
-                    <b>Mamá:</b> ${personas[0].nombreMadre}<br>
-                    <b>Domicilio:</b> ${personas[0].domicilio}<br>
-                    <b>Niños registrados aquí:</b> ${personas.length}<hr>`;
+                let content = `<b>Mamá:</b> ${personas[0].nombreMadre}<br>
+                               <b>Niños en este punto:</b> ${personas.length}<hr>`;
                 
                 personas.forEach(p => {
                     content += `<div class="child-tag">
-                        👶 ${p.nombreHijo} (${calcularEdad(p.nacimientoHijo)})
+                        👶 ${p.nombreHijo}<br>
+                        <b>Edad:</b> ${calcularEdad(p.nacimientoHijo)}
                     </div>`;
-                    totalNiños++;
                 });
-
-                content += `</div>`;
 
                 L.marker(latlng).bindPopup(content).addTo(markersLayer);
             }
 
-            document.getElementById('stats').innerText = `Mostrando ${totalNiños} niños registrados.`;
+            document.getElementById('stats').innerText = `Se encontraron ${totalMatch} niños.`;
 
         } catch (e) {
-            console.error("Error cargando datos:", e);
+            document.getElementById('stats').innerText = "Error al cargar datos.";
+            console.error(e);
         }
     }
 
-    // Cargar al iniciar
     loadMarkers();
 </script>
 
