@@ -92,8 +92,8 @@
     function calcularFechaAlta(fechaAnemiaStr) {
         const fecha = parseExcelDate(fechaAnemiaStr);
         if (!fecha || isNaN(fecha)) return "No disponible";
-        // Sumar 7 meses
-        fecha.setMonth(fecha.getMonth() + 7);
+        // Sumar 6 meses
+        fecha.setMonth(fecha.getMonth() + 6);
         return formatDate(fecha);
     }
 
