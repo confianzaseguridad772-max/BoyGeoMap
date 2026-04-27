@@ -30,7 +30,6 @@
         }
 
         .child-tag { background: #f3f0ff; padding: 10px; border-radius: 8px; display: block; margin-top: 5px; font-size: 0.85em; border-left: 4px solid #764ba2; }
-        /* Estilo Alerta Anemia */
         .anemia-alert { border-left: 4px solid #e53e3e; background: #fff5f5; color: #2d3748; }
         .anemia-text { color: #c53030; font-weight: 700; }
         
@@ -56,7 +55,6 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     let markersLayer = L.layerGroup().addTo(map);
 
-    // Configuración de iconos
     const redIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
@@ -70,13 +68,15 @@
     });
 
     function parseExcelDate(dateStr) {
-        if (!dateStr || dateStr === "") return null;
+        if (!dateStr || dateStr === "" || dateStr === "S/D") return null;
+        // Si el formato es DD/MM/AAAA
         const p = dateStr.split("/");
+        if(p.length !== 3) return null;
         return new Date(p[2], p[1] - 1, p[0]);
     }
 
     function formatDate(date) {
-        if (!date) return "S/D";
+        if (!date || isNaN(date)) return "S/D";
         return date.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
 
@@ -87,14 +87,6 @@
         let edad = hoy.getFullYear() - cumple.getFullYear();
         if (hoy.getMonth() < cumple.getMonth() || (hoy.getMonth() === cumple.getMonth() && hoy.getDate() < cumple.getDate())) edad--;
         return edad + (edad === 1 ? " año" : " años");
-    }
-
-    function calcularFechaAlta(fechaAnemiaStr) {
-        const fecha = parseExcelDate(fechaAnemiaStr);
-        if (!fecha || isNaN(fecha)) return "No disponible";
-        // Sumar 6 meses
-        fecha.setMonth(fecha.getMonth() + 6);
-        return formatDate(fecha);
     }
 
     async function loadMarkers() {
@@ -128,22 +120,32 @@
                 const personas = grupos[coord];
                 const latlng = coord.split(",").map(Number);
                 
-                // Si al menos uno tiene anemia, el marcador será rojo
-                const tieneAnemiaCualquiera = personas.some(p => String(p.anemia).toUpperCase() === "SI");
+                // LÓGICA CORREGIDA: Si la columna anemia tiene un valor (SI o una FECHA), es anemia.
+                const tieneAnemiaCualquiera = personas.some(p => p.anemia && p.anemia !== "");
                 
-                let content = `<b>Mamá:</b> ${personas[0].nombreMadre}<br>
+                let content = `<b>Mamá:</b> ${personas[0].nombreMadre || 'No registrado'}<br>
                                <b>Niños en casa:</b> ${personas.length}<hr>`;
                 
                 personas.forEach(p => {
-                    const esAnemico = String(p.anemia).toUpperCase() === "SI";
+                    const esAnemico = p.anemia && p.anemia !== "";
+                    let fechaAlta = "No disponible";
+                    
+                    if (esAnemico) {
+                        const fAnemia = parseExcelDate(p.anemia); // Intenta leer la fecha de la columna O
+                        if (fAnemia) {
+                            fAnemia.setMonth(fAnemia.getMonth() + 7);
+                            fechaAlta = formatDate(fAnemia);
+                        }
+                    }
+
                     content += `
                     <div class="child-tag ${esAnemico ? 'anemia-alert' : ''}">
-                        👦 <b>${p.nombreHijo}</b><br>
+                        👶 <b>${p.nombreHijo}</b><br>
                         🎂 Edad: ${calcularEdad(p.nacimientoHijo)}<br>
                         ${esAnemico ? 
                             `<span class="anemia-text">⚠️ Sí tiene anemia</span><br>
-                             📅 Diagnóstico: ${p.fechaAnemia}<br>
-                             ⏳ <b>Alta estimada: ${calcularFechaAlta(p.fechaAnemia)}</b>` : 
+                             📅 Diagnóstico: ${p.anemia}<br>
+                             ⏳ <b>Alta estimada: ${fechaAlta}</b>` : 
                             '✅ Sin anemia'}
                     </div>`;
                 });
@@ -153,7 +155,7 @@
                  .addTo(markersLayer);
             }
 
-            document.getElementById('stats').innerText = `Se encontraron ${totalMatch} resultados.`;
+            document.getElementById('stats').innerText = `Se encontraron ${totalMatch} niños.`;
 
         } catch (e) {
             document.getElementById('stats').innerText = "Error de conexión.";
