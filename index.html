@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoBoy - Visor de Cobertura (Alerta Anemia)</title>
+    <title>GeoBoy - Control de Anemia</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -29,9 +29,10 @@
             color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 15px;
         }
 
-        .child-tag { background: #f3f0ff; padding: 8px; border-radius: 6px; display: block; margin-top: 5px; font-size: 0.85em; border-left: 3px solid #764ba2; }
-        /* Estilo para cuando hay anemia */
-        .anemia-alert { border-left: 3px solid #e53e3e; background: #fff5f5; color: #c53030; }
+        .child-tag { background: #f3f0ff; padding: 10px; border-radius: 8px; display: block; margin-top: 5px; font-size: 0.85em; border-left: 4px solid #764ba2; }
+        /* Estilo Alerta Anemia */
+        .anemia-alert { border-left: 4px solid #e53e3e; background: #fff5f5; color: #2d3748; }
+        .anemia-text { color: #c53030; font-weight: 700; }
         
         #stats { margin-top:12px; font-size: 0.8em; color: #718096; font-weight: 500; }
     </style>
@@ -39,14 +40,11 @@
 <body>
 
 <div class="search-panel">
-    <h2><i class="fas fa-hand-holding-heart"></i> Control de Anemia</h2>
-    
+    <h2><i class="fas fa-map-marker-alt"></i> Visor de Cobertura</h2>
     <label>Desde (Nacimiento):</label>
     <input type="date" id="dateStart">
-    
     <label>Hasta (Nacimiento):</label>
     <input type="date" id="dateEnd">
-    
     <button class="btn-filter" onclick="loadMarkers()">Filtrar Mapa</button>
     <div id="stats">Cargando datos...</div>
 </div>
@@ -58,7 +56,7 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     let markersLayer = L.layerGroup().addTo(map);
 
-    // Iconos de colores
+    // Configuración de iconos
     const redIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
@@ -72,18 +70,31 @@
     });
 
     function parseExcelDate(dateStr) {
-        if (!dateStr) return null;
+        if (!dateStr || dateStr === "") return null;
         const p = dateStr.split("/");
         return new Date(p[2], p[1] - 1, p[0]);
     }
 
+    function formatDate(date) {
+        if (!date) return "S/D";
+        return date.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
     function calcularEdad(fechaStr) {
         const cumple = parseExcelDate(fechaStr);
-        if (!cumple) return "S/D";
+        if (!cumple || isNaN(cumple)) return "S/D";
         const hoy = new Date();
         let edad = hoy.getFullYear() - cumple.getFullYear();
         if (hoy.getMonth() < cumple.getMonth() || (hoy.getMonth() === cumple.getMonth() && hoy.getDate() < cumple.getDate())) edad--;
-        return edad + " años";
+        return edad + (edad === 1 ? " año" : " años");
+    }
+
+    function calcularFechaAlta(fechaAnemiaStr) {
+        const fecha = parseExcelDate(fechaAnemiaStr);
+        if (!fecha || isNaN(fecha)) return "No disponible";
+        // Sumar 7 meses
+        fecha.setMonth(fecha.getMonth() + 7);
+        return formatDate(fecha);
     }
 
     async function loadMarkers() {
@@ -117,32 +128,35 @@
                 const personas = grupos[coord];
                 const latlng = coord.split(",").map(Number);
                 
-                // Verificar si algún niño en esta ubicación tiene anemia
+                // Si al menos uno tiene anemia, el marcador será rojo
                 const tieneAnemiaCualquiera = personas.some(p => String(p.anemia).toUpperCase() === "SI");
                 
                 let content = `<b>Mamá:</b> ${personas[0].nombreMadre}<br>
-                               <b>Niños:</b> ${personas.length}<hr>`;
+                               <b>Niños en casa:</b> ${personas.length}<hr>`;
                 
                 personas.forEach(p => {
                     const esAnemico = String(p.anemia).toUpperCase() === "SI";
                     content += `
                     <div class="child-tag ${esAnemico ? 'anemia-alert' : ''}">
-                        👶 <b>${p.nombreHijo}</b><br>
+                        👦 <b>${p.nombreHijo}</b><br>
                         🎂 Edad: ${calcularEdad(p.nacimientoHijo)}<br>
-                        ${esAnemico ? `⚠️ <b>ANEMIA: SI</b><br>📅 Fecha: ${p.fechaAnemia || 'No registrada'}` : '✅ Sin anemia'}
+                        ${esAnemico ? 
+                            `<span class="anemia-text">⚠️ Sí tiene anemia</span><br>
+                             📅 Diagnóstico: ${p.fechaAnemia}<br>
+                             ⏳ <b>Alta estimada: ${calcularFechaAlta(p.fechaAnemia)}</b>` : 
+                            '✅ Sin anemia'}
                     </div>`;
                 });
 
-                // Si hay anemia, el marcador es ROJO; si no, AZUL.
                 L.marker(latlng, { icon: tieneAnemiaCualquiera ? redIcon : blueIcon })
                  .bindPopup(content)
                  .addTo(markersLayer);
             }
 
-            document.getElementById('stats').innerText = `Se encontraron ${totalMatch} niños.`;
+            document.getElementById('stats').innerText = `Se encontraron ${totalMatch} resultados.`;
 
         } catch (e) {
-            document.getElementById('stats').innerText = "Error al cargar datos.";
+            document.getElementById('stats').innerText = "Error de conexión.";
             console.error(e);
         }
     }
