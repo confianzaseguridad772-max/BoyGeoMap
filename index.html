@@ -51,7 +51,7 @@
             color: #b91c1c; font-weight: 700; display: block; margin-top: 4px;
             font-size: 0.85em; text-transform: uppercase;
         }
-        .alta-date { color: #15803d; font-weight: 600; }
+        .alta-date { color: #15803d; font-weight: 600; font-size: 0.85em; }
         
         #stats { 
             margin-top: 15px; font-size: 0.75em; color: #94a3b8; 
@@ -93,16 +93,14 @@
         iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
     });
 
-    // MOTOR DE PROCESAMIENTO DE FECHAS (Resuelve NaN y S/D)
+    // MOTOR DE FECHAS MEJORADO
     function parseRobustDate(val) {
-        if (!val || val === "" || String(val).includes("#")) return null;
+        if (!val || val === "" || String(val).includes("#") || val === 0) return null;
         
-        // Manejo de números seriales de Excel
         if (!isNaN(val) && typeof val === 'number') {
             return new Date((val - 25569) * 86400 * 1000);
         }
 
-        // Manejo de texto DD/MM/AAAA o DD-MM-AAAA
         let s = String(val).trim();
         let parts = s.split(/[\/\-]/);
         if (parts.length === 3) {
@@ -117,13 +115,25 @@
         return isNaN(nativeDate.getTime()) ? null : nativeDate;
     }
 
+    // CÁLCULO DE EDAD CORREGIDO (Años y Meses)
     function getEdad(fechaNacStr) {
         const f = parseRobustDate(fechaNacStr);
         if (!f) return "S/D";
         const hoy = new Date();
-        let edad = hoy.getFullYear() - f.getFullYear();
-        if (hoy.getMonth() < f.getMonth() || (hoy.getMonth() === f.getMonth() && hoy.getDate() < f.getDate())) edad--;
-        return (edad < 0 ? 0 : edad) + (edad === 1 ? " año" : " años");
+        
+        let edadAnios = hoy.getFullYear() - f.getFullYear();
+        let edadMeses = hoy.getMonth() - f.getMonth();
+        
+        if (edadMeses < 0 || (edadMeses === 0 && hoy.getDate() < f.getDate())) {
+            edadAnios--;
+            edadMeses += 12;
+        }
+
+        if (edadAnios < 1) {
+            return edadMeses + (edadMeses === 1 ? " mes" : " meses");
+        } else {
+            return edadAnios + (edadAnios === 1 ? " año" : " años") + (edadMeses > 0 ? " y " + edadMeses + " m" : "");
+        }
     }
 
     async function loadMarkers() {
@@ -133,8 +143,9 @@
         const dEnd = endStr ? new Date(endStr + "T23:59:59") : null;
 
         markersLayer.clearLayers();
-        document.getElementById('stats').innerText = "Sincronizando con Google Sheets...";
+        document.getElementById('stats').innerText = "Sincronizando datos manuales...";
 
+        // URL de tu Script de Google
         const URL_API = "https://script.google.com/macros/s/AKfycbyXn_7STdNy6TtK0WsOKGSrWRWg-cN-btfuuJVI2mgI_J9HVHyPfkgl0Kt1-iJ4Cxk/exec";
 
         try {
@@ -143,8 +154,8 @@
             const grupos = {};
             let matchCount = 0;
 
+            // Agrupación por coordenadas
             data.forEach(item => {
-                // Limpieza de coordenadas corruptas (#VALUE!)
                 if (!item.coords || String(item.coords).includes("#")) return;
 
                 const fNac = parseRobustDate(item.nacimientoHijo);
@@ -161,30 +172,33 @@
                 const latlng = coord.split(",").map(Number);
                 if (isNaN(latlng[0])) continue;
 
-                // CUALQUIER DATO en la columna Anemia activa el color ROJO
-                const tieneAnemiaEnCasa = personas.some(p => p.anemia && String(p.anemia).trim() !== "");
+                // DETECCIÓN DE ANEMIA MANUAL (Si hay algo escrito en la columna O)
+                const tieneAnemiaEnCasa = personas.some(p => {
+                    const val = p.anemia || p.Anemia; // Soporta ambas mayúsculas/minúsculas
+                    return val && String(val).trim() !== "" && String(val).trim() !== "0";
+                });
                 
-                let html = `<div style="min-width:220px">
-                            <b style="color:#1e293b">Mamá:</b> ${personas[0].nombreMadre || 'No registrado'}<br>
-                            <small>Integrantes en este punto: ${personas.length}</small><hr style="border:0; border-top:1px solid #eee">`;
+                let html = `<div style="min-width:240px">
+                            <b style="color:#1e293b">📍 Ubicación Registrada</b><br>
+                            <small>Integrantes en este punto: ${personas.length}</small><hr style="border:0; border-top:1px solid #eee; margin:10px 0">`;
                 
                 personas.forEach(p => {
-                    const anemiaVal = p.anemia ? String(p.anemia).trim() : "";
-                    const esAnemico = anemiaVal !== "";
-                    const fDiag = parseRobustDate(anemiaVal);
+                    const valAnemia = (p.anemia || p.Anemia || "").toString().trim();
+                    const esAnemico = valAnemia !== "" && valAnemia !== "0";
+                    const fDiag = parseRobustDate(valAnemia);
                     
-                    let detalle = "✅ Sin anemia";
+                    let detalle = "<span style='color:#15803d'>✅ Sin anemia</span>";
                     if (esAnemico) {
-                        let altaStr = "Pendiente de fecha";
+                        let altaStr = "Fecha de alta: Pendiente";
                         if (fDiag) {
                             let fAlta = new Date(fDiag);
-                            fAlta.setMonth(fAlta.getMonth() + 6); // CÁLCULO A 6 MESES
-                            altaStr = fAlta.toLocaleDateString('es-PE', {day:'2-digit', month:'2-digit', year:'numeric'});
+                            fAlta.setMonth(fAlta.getMonth() + 6);
+                            altaStr = "Alta Médica (6m): " + fAlta.toLocaleDateString('es-PE');
                         }
                         detalle = `
                             <span class="anemia-text">⚠️ Caso de Anemia</span>
-                            📅 Diagnóstico: ${anemiaVal}<br>
-                            ⏳ <span class="alta-date">Alta Médica (6m): ${altaStr}</span>
+                            <b>Diagnóstico:</b> ${valAnemia}<br>
+                            <span class="alta-date">📅 ${altaStr}</span>
                         `;
                     }
 
@@ -203,15 +217,14 @@
                  .addTo(markersLayer);
             }
 
-            document.getElementById('stats').innerText = `Visualizando ${matchCount} registros filtrados.`;
+            document.getElementById('stats').innerText = `Mostrando ${matchCount} niños en el mapa.`;
 
         } catch (e) {
-            document.getElementById('stats').innerText = "Error al obtener datos del servidor.";
+            document.getElementById('stats').innerText = "Error al conectar con Google Sheets.";
             console.error(e);
         }
     }
 
-    // Ejecución inicial
     loadMarkers();
 </script>
 
