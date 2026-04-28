@@ -111,43 +111,80 @@
         iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
     });
 
-    // --- LÓGICA DE FECHAS PROTEGIDA ---
+    // --- LÓGICA DE FECHAS MEJORADA ---
     function parseRobustDate(val) {
         if (!val || val === "" || String(val).includes("#")) return null;
-        if (!isNaN(val) && typeof val === 'number') return new Date((val - 25569) * 86400 * 1000);
+        
+        // Si el dato es un número de serie de Excel
+        if (!isNaN(val) && typeof val === 'number') {
+            return new Date((val - 25569) * 86400 * 1000);
+        }
 
         let s = String(val).trim();
         let parts = s.split(/[\/\-]/);
+        
         if (parts.length === 3) {
             let d = parseInt(parts[0], 10);
             let m = parseInt(parts[1], 10) - 1;
             let a = parseInt(parts[2], 10);
-            if (a < 100) a += 2000; // Corrección para años '25', '26'
-            return new Date(a, m, d);
+            
+            // Forzar siglo XXI para años de 2 dígitos (25 -> 2025)
+            if (a < 100) a += 2000; 
+            
+            // Usamos horas, min, seg en 0 para evitar problemas de zona horaria
+            return new Date(a, m, d, 0, 0, 0);
         }
-        return new Date(s);
+        
+        let dObj = new Date(s);
+        if(!isNaN(dObj.getTime()) && dObj.getFullYear() < 100) {
+            dObj.setFullYear(dObj.getFullYear() + 2000);
+        }
+        return dObj;
     }
 
     function getEdad(fechaNacStr) {
         const f = parseRobustDate(fechaNacStr);
-        if (!f || isNaN(f)) return "S/D";
+        if (!f || isNaN(f.getTime())) return "S/D";
+        
         const hoy = new Date();
+        // Normalizamos hoy a las 00:00 para la comparación
+        hoy.setHours(0, 0, 0, 0);
+
         let anios = hoy.getFullYear() - f.getFullYear();
         let meses = hoy.getMonth() - f.getMonth();
-        if (meses < 0 || (meses === 0 && hoy.getDate() < f.getDate())) {
+        let dias = hoy.getDate() - f.getDate();
+
+        // Ajuste si el día actual es menor al día de nacimiento
+        if (dias < 0) {
+            meses--;
+        }
+        // Ajuste si los meses resultan negativos
+        if (meses < 0) {
             anios--;
             meses += 12;
         }
+
         if (anios < 0) return "Recién nacido";
-        if (anios < 1) return meses + (meses === 1 ? " mes" : " meses");
+        if (anios === 0) return meses + (meses === 1 ? " mes" : " meses");
         return `${anios} ${anios === 1 ? 'año' : 'años'}${meses > 0 ? ' y ' + meses + ' m' : ''}`;
     }
 
     async function loadMarkers() {
         const startStr = document.getElementById('dateStart').value;
         const endStr = document.getElementById('dateEnd').value;
-        const dStart = startStr ? new Date(startStr + "T00:00:00") : null;
-        const dEnd = endStr ? new Date(endStr + "T23:59:59") : null;
+        
+        // Convertir filtros de búsqueda a objetos Date comparables
+        let dStart = null;
+        let dEnd = null;
+        
+        if (startStr) {
+            let sParts = startStr.split('-'); // Formato YYYY-MM-DD
+            dStart = new Date(sParts[0], sParts[1]-1, sParts[2], 0, 0, 0);
+        }
+        if (endStr) {
+            let eParts = endStr.split('-');
+            dEnd = new Date(eParts[0], eParts[1]-1, eParts[2], 23, 59, 59);
+        }
 
         markersLayer.clearLayers();
         document.getElementById('stats').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sincronizando datos...';
@@ -162,8 +199,10 @@
                 if (!item.coords || item.coords.includes("#")) return;
                 
                 const fNac = parseRobustDate(item.nacimientoHijo);
-                if (dStart && fNac && fNac < dStart) return;
-                if (dEnd && fNac && fNac > dEnd) return;
+                
+                // --- FILTRADO POR FECHAS MEJORADO ---
+                if (dStart && fNac && fNac.getTime() < dStart.getTime()) return;
+                if (dEnd && fNac && fNac.getTime() > dEnd.getTime()) return;
 
                 if (!grupos[item.coords]) grupos[item.coords] = [];
                 grupos[item.coords].push(item);
@@ -194,9 +233,9 @@
                     if (esAnemico) {
                         const fDiag = parseRobustDate(valAnemia);
                         let altaTxt = "";
-                        if (fDiag && !isNaN(fDiag)) {
+                        if (fDiag && !isNaN(fDiag.getTime())) {
                             let fAlta = new Date(fDiag);
-                            fAlta.setMonth(fAlta.getMonth() + 7); // Cálculo de alta a los 7 meses
+                            fAlta.setMonth(fAlta.getMonth() + 7);
                             altaTxt = `<span class="alta-info"><i class="fas fa-calendar-check"></i> Alta estimada: ${fAlta.toLocaleDateString('es-PE')}</span>`;
                         }
                         anemiaHtml = `
