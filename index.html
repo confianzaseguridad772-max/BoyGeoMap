@@ -3,91 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoBoy - Control Epidemiológico</title>
+    <title>GeoBoy Castillo - Monitor Pro</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
         :root {
-            --primary: #1a73e8;
-            --danger: #d93025;
-            --success: #188038;
-            --bg-panel: rgba(255, 255, 255, 0.98);
+            --primary: #2563eb;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --glass: rgba(255, 255, 255, 0.85);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
 
-        body { font-family: 'Poppins', sans-serif; margin: 0; padding: 0; overflow: hidden; }
-        #map { height: 100vh; width: 100%; z-index: 1; background: #e5e3df; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Inter', sans-serif; background: #f0f2f5; }
+        #map { height: 100vh; width: 100%; z-index: 1; }
 
-        /* Panel Lateral */
+        /* Panel Lateral Moderno (Glassmorphism) */
         .search-panel {
-            position: absolute; top: 15px; left: 15px; z-index: 1000;
-            background: var(--bg-panel); padding: 20px; border-radius: 12px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3); width: 310px;
-            border: 1px solid #dadce0;
+            position: absolute; top: 20px; left: 20px; z-index: 1000;
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 24px; border-radius: 20px;
+            box-shadow: var(--shadow); width: 320px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: transform 0.3s ease;
         }
 
-        h2 { margin: 0 0 15px 0; font-size: 1.15em; color: #3c4043; display: flex; align-items: center; gap: 10px; }
-        label { font-size: 0.75em; font-weight: 600; color: #70757a; display: block; margin-top: 12px; text-transform: uppercase; }
+        h2 { margin: 0 0 20px 0; font-size: 1.25rem; color: #1e293b; font-weight: 600; display: flex; align-items: center; gap: 12px; }
         
-        input { 
-            width: 100%; padding: 10px; margin-top: 5px; 
-            border: 1px solid #dadce0; border-radius: 6px; 
-            box-sizing: border-box; font-family: inherit; font-size: 0.9em;
+        .input-group { margin-bottom: 15px; }
+        label { font-size: 0.7rem; font-weight: 700; color: #64748b; display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        input[type="date"] { 
+            width: 100%; padding: 12px; 
+            border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; 
+            font-family: inherit; font-size: 0.9rem; background: white;
+            transition: border 0.2s;
         }
+        input[type="date"]:focus { outline: none; border-color: var(--primary); ring: 2px rgba(37, 99, 235, 0.2); }
         
         .btn-filter { 
             width: 100%; background: var(--primary);
-            color: white; border: none; padding: 12px; border-radius: 6px; 
-            cursor: pointer; font-weight: 600; margin-top: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: all 0.2s;
+            color: white; border: none; padding: 14px; border-radius: 12px; 
+            cursor: pointer; font-weight: 600; margin-top: 10px;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: all 0.3s;
         }
-        .btn-filter:hover { background: #1557b0; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        .btn-filter:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
 
-        /* Popups */
-        .leaflet-popup-content-wrapper { border-radius: 12px; padding: 8px; }
-        .popup-container { min-width: 280px; max-height: 400px; overflow-y: auto; }
+        /* Popups Estilo App Móvil */
+        .leaflet-popup-content-wrapper { border-radius: 18px; padding: 5px; box-shadow: var(--shadow); }
+        .popup-container { width: 290px; max-height: 450px; overflow-y: auto; padding: 5px; }
         
         .header-vivienda { 
-            padding-bottom: 8px; border-bottom: 2px solid #f1f3f4; margin-bottom: 10px;
-            font-size: 0.9em; color: #3c4043;
+            padding: 12px; background: #f8fafc; border-radius: 14px; margin-bottom: 12px;
+            border: 1px solid #e2e8f0;
         }
+        .header-vivienda b { color: #0f172a; display: block; font-size: 1rem; }
+        .header-vivienda small { color: #64748b; font-size: 0.75rem; }
 
         .child-card { 
-            background: #f8f9fa; padding: 12px; border-radius: 10px; 
-            margin-bottom: 10px; border-left: 5px solid var(--primary);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            background: white; padding: 15px; border-radius: 14px; 
+            margin-bottom: 12px; border: 1px solid #f1f5f9;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            position: relative; overflow: hidden;
         }
-        .child-card.anemia-alert { border-left-color: var(--danger); background: #fef7f7; }
+        .child-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--primary); }
+        .child-card.anemia-alert::before { background: var(--danger); }
         
-        .name { font-weight: 600; color: #202124; font-size: 1em; display: block; }
-        .info { font-size: 0.85em; color: #5f6368; margin-top: 4px; }
+        .name { font-weight: 600; color: #1e293b; font-size: 0.95rem; display: block; margin-bottom: 6px; }
+        .info { font-size: 0.8rem; color: #475569; line-height: 1.6; }
+        .info i { width: 18px; color: #94a3b8; }
         
-        .status-box { 
-            margin-top: 8px; padding-top: 8px; border-top: 1px inset #eee;
-            font-weight: 600; font-size: 0.8em; display: flex; align-items: center; gap: 6px;
+        .status-badge { 
+            margin-top: 10px; padding: 6px 10px; border-radius: 8px;
+            font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;
         }
-        .text-red { color: var(--danger); }
-        .text-green { color: var(--success); }
+        .bg-red { background: #fef2f2; color: var(--danger); }
+        .bg-green { background: #f0fdf4; color: var(--success); }
         
-        .alta-info { font-size: 0.85em; color: #188038; display: block; margin-top: 2px; }
-
-        #stats { margin-top: 15px; font-size: 0.75em; color: #70757a; border-top: 1px solid #f1f3f4; padding-top: 10px; }
+        #stats { margin-top: 20px; font-size: 0.8rem; color: #64748b; text-align: center; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 15px; }
     </style>
 </head>
 <body>
 
 <div class="search-panel">
-    <h2><i class="fas fa-microscope" style="color:var(--primary)"></i> GeoBoy Castillo</h2>
+    <h2><i class="fas fa-satellite-dish" style="color:var(--primary)"></i> GeoBoy Pro</h2>
     
-    <label>Filtrar por Nacimiento:</label>
-    <input type="date" id="dateStart">
-    <input type="date" id="dateEnd" style="margin-top:8px">
+    <div class="input-group">
+        <label>Desde el nacimiento</label>
+        <input type="date" id="dateStart">
+    </div>
+    <div class="input-group">
+        <label>Hasta el nacimiento</label>
+        <input type="date" id="dateEnd">
+    </div>
     
-    <button class="btn-filter" onclick="loadMarkers()"><i class="fas fa-sync"></i> Actualizar Mapa</button>
-    <div id="stats">Cargando base de datos...</div>
+    <button class="btn-filter" onclick="loadMarkers()">
+        <i class="fas fa-sync-alt"></i> Sincronizar Mapa
+    </button>
+    
+    <div id="stats">Iniciando sistemas...</div>
 </div>
 
 <div id="map"></div>
@@ -95,75 +116,66 @@
 <script>
     const URL_API = "https://script.google.com/macros/s/AKfycbyoVyTvKXdIOUtsivdZ2IZQy7s249MsjaKpjrgQWiB4-OeX8vLhfGKRDoZE2Niy13n4/exec";
 
-    const map = L.map('map', { zoomControl: false }).setView([-9.2938, -75.9926], 14);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+    // --- CONFIGURACIÓN DE MAPAS MODERNOS ---
+    const light = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© CartoDB'
+    });
+
+    const satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+        attribution: '© Google Maps'
+    });
+
+    const map = L.map('map', {
+        center: [-9.2938, -75.9926],
+        zoom: 15,
+        layers: [satellite], // Iniciamos con vista satelital para ver las casas
+        zoomControl: false
+    });
+
+    // Control de Capas
+    const baseMaps = {
+        "Vista Satelital": satellite,
+        "Mapa Claro": light
+    };
+    L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     
     let markersLayer = L.layerGroup().addTo(map);
 
-    const redIcon = new L.Icon({
-        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+    // Iconos Minimalistas
+    const createIcon = (color) => new L.Icon({
+        iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${color}.png`,
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
         iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
     });
 
-    const blueIcon = new L.Icon({
-        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
-        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-    });
+    const redIcon = createIcon('red');
+    const blueIcon = createIcon('blue');
 
-    // --- LÓGICA DE FECHAS MEJORADA ---
     function parseRobustDate(val) {
         if (!val || val === "" || String(val).includes("#")) return null;
-        
-        // Si el dato es un número de serie de Excel
-        if (!isNaN(val) && typeof val === 'number') {
-            return new Date((val - 25569) * 86400 * 1000);
-        }
-
+        if (!isNaN(val) && typeof val === 'number') return new Date((val - 25569) * 86400 * 1000);
         let s = String(val).trim();
         let parts = s.split(/[\/\-]/);
-        
         if (parts.length === 3) {
-            let d = parseInt(parts[0], 10);
-            let m = parseInt(parts[1], 10) - 1;
-            let a = parseInt(parts[2], 10);
-            
-            // Forzar siglo XXI para años de 2 dígitos (25 -> 2025)
-            if (a < 100) a += 2000; 
-            
-            // Usamos horas, min, seg en 0 para evitar problemas de zona horaria
+            let d = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, a = parseInt(parts[2], 10);
+            if (a < 100) a += 2000;
             return new Date(a, m, d, 0, 0, 0);
         }
-        
         let dObj = new Date(s);
-        if(!isNaN(dObj.getTime()) && dObj.getFullYear() < 100) {
-            dObj.setFullYear(dObj.getFullYear() + 2000);
-        }
+        if(!isNaN(dObj.getTime()) && dObj.getFullYear() < 100) dObj.setFullYear(dObj.getFullYear() + 2000);
         return dObj;
     }
 
     function getEdad(fechaNacStr) {
         const f = parseRobustDate(fechaNacStr);
         if (!f || isNaN(f.getTime())) return "S/D";
-        
         const hoy = new Date();
-        // Normalizamos hoy a las 00:00 para la comparación
         hoy.setHours(0, 0, 0, 0);
-
         let anios = hoy.getFullYear() - f.getFullYear();
         let meses = hoy.getMonth() - f.getMonth();
-        let dias = hoy.getDate() - f.getDate();
-
-        // Ajuste si el día actual es menor al día de nacimiento
-        if (dias < 0) {
-            meses--;
-        }
-        // Ajuste si los meses resultan negativos
-        if (meses < 0) {
-            anios--;
-            meses += 12;
-        }
-
+        if (hoy.getDate() < f.getDate()) meses--;
+        if (meses < 0) { anios--; meses += 12; }
         if (anios < 0) return "Recién nacido";
         if (anios === 0) return meses + (meses === 1 ? " mes" : " meses");
         return `${anios} ${anios === 1 ? 'año' : 'años'}${meses > 0 ? ' y ' + meses + ' m' : ''}`;
@@ -172,22 +184,11 @@
     async function loadMarkers() {
         const startStr = document.getElementById('dateStart').value;
         const endStr = document.getElementById('dateEnd').value;
-        
-        // Convertir filtros de búsqueda a objetos Date comparables
-        let dStart = null;
-        let dEnd = null;
-        
-        if (startStr) {
-            let sParts = startStr.split('-'); // Formato YYYY-MM-DD
-            dStart = new Date(sParts[0], sParts[1]-1, sParts[2], 0, 0, 0);
-        }
-        if (endStr) {
-            let eParts = endStr.split('-');
-            dEnd = new Date(eParts[0], eParts[1]-1, eParts[2], 23, 59, 59);
-        }
+        let dStart = startStr ? new Date(startStr + "T00:00:00") : null;
+        let dEnd = endStr ? new Date(endStr + "T23:59:59") : null;
 
         markersLayer.clearLayers();
-        document.getElementById('stats').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sincronizando datos...';
+        document.getElementById('stats').innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Procesando coordenadas...';
 
         try {
             const response = await fetch(URL_API);
@@ -197,13 +198,9 @@
 
             data.forEach(item => {
                 if (!item.coords || item.coords.includes("#")) return;
-                
                 const fNac = parseRobustDate(item.nacimientoHijo);
-                
-                // --- FILTRADO POR FECHAS MEJORADO ---
-                if (dStart && fNac && fNac.getTime() < dStart.getTime()) return;
-                if (dEnd && fNac && fNac.getTime() > dEnd.getTime()) return;
-
+                if (dStart && fNac && fNac < dStart) return;
+                if (dEnd && fNac && fNac > dEnd) return;
                 if (!grupos[item.coords]) grupos[item.coords] = [];
                 grupos[item.coords].push(item);
                 contador++;
@@ -212,7 +209,6 @@
             for (const coord in grupos) {
                 const personas = grupos[coord];
                 const latlng = coord.split(",").map(Number);
-                
                 const tieneAnemia = personas.some(p => {
                     let a = (p.anemia || "").toString().trim();
                     return a !== "" && a !== "0";
@@ -220,15 +216,14 @@
 
                 let html = `<div class="popup-container">
                     <div class="header-vivienda">
-                        <i class="fas fa-home"></i> Madre: <b>${personas[0].nombreMadre || 'No registrado'}</b><br>
-                        <small><i class="fas fa-users"></i> Niños en este punto: ${personas.length}</small>
+                        <small>RESPONSABLE DE VIVIENDA</small>
+                        <b>${personas[0].nombreMadre || 'No registrado'}</b>
                     </div>`;
 
                 personas.forEach(p => {
                     const valAnemia = (p.anemia || "").toString().trim();
                     const esAnemico = valAnemia !== "" && valAnemia !== "0";
-                    
-                    let anemiaHtml = `<div class="status-box text-green"><i class="fas fa-check-circle"></i> Sin anemia</div>`;
+                    let anemiaBadge = `<div class="status-badge bg-green"><i class="fas fa-shield-alt"></i> Protegido</div>`;
                     
                     if (esAnemico) {
                         const fDiag = parseRobustDate(valAnemia);
@@ -236,30 +231,28 @@
                         if (fDiag && !isNaN(fDiag.getTime())) {
                             let fAlta = new Date(fDiag);
                             fAlta.setMonth(fAlta.getMonth() + 7);
-                            altaTxt = `<span class="alta-info"><i class="fas fa-calendar-check"></i> Alta estimada: ${fAlta.toLocaleDateString('es-PE')}</span>`;
+                            altaTxt = `<br><span style="color:#ef4444; font-size:0.7rem">Alta estimada: ${fAlta.toLocaleDateString('es-PE')}</span>`;
                         }
-                        anemiaHtml = `
-                            <div class="status-box text-red"><i class="fas fa-exclamation-triangle"></i> ANEMIA (${valAnemia})</div>
-                            ${altaTxt}`;
+                        anemiaBadge = `<div class="status-badge bg-red"><i class="fas fa-virus-slash"></i> ANEMIA (${valAnemia})${altaTxt}</div>`;
                     }
 
                     html += `
                         <div class="child-card ${esAnemico ? 'anemia-alert' : ''}">
                             <span class="name">👶 ${p.nombreHijo}</span>
                             <div class="info">
-                                <i class="fas fa-clock"></i> Edad: ${getEdad(p.nacimientoHijo)}<br>
-                                <i class="fas fa-id-card"></i> DNI: ${p.dniHijo || 'S/D'}
+                                <i class="fas fa-birthday-cake"></i> ${getEdad(p.nacimientoHijo)}<br>
+                                <i class="fas fa-fingerprint"></i> DNI: ${p.dniHijo || 'S/D'}
                             </div>
-                            ${anemiaHtml}
+                            ${anemiaBadge}
                         </div>`;
                 });
 
                 html += `</div>`;
                 L.marker(latlng, { icon: tieneAnemia ? redIcon : blueIcon }).bindPopup(html).addTo(markersLayer);
             }
-            document.getElementById('stats').innerText = `${contador} niños mapeados con éxito.`;
+            document.getElementById('stats').innerText = `${contador} objetivos localizados.`;
         } catch (e) {
-            document.getElementById('stats').innerText = "Error de conexión con la sábana de datos.";
+            document.getElementById('stats').innerText = "Error de sincronización.";
         }
     }
     loadMarkers();
