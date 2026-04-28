@@ -15,6 +15,7 @@
             --primary: #2563eb;
             --danger: #ef4444;
             --success: #22c55e;
+            --warning: #f97316; /* Color para inasistentes */
             --glass: rgba(255, 255, 255, 0.9);
             --shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
         }
@@ -22,7 +23,7 @@
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Inter', sans-serif; background: #f0f2f5; overflow: hidden; }
         #map { height: 100vh; width: 100%; z-index: 1; }
 
-        /* Panel Lateral Elegante */
+        /* Panel Lateral */
         .search-panel {
             position: absolute; top: 20px; left: 20px; z-index: 1000;
             background: var(--glass);
@@ -34,7 +35,6 @@
         }
 
         h2 { margin: 0 0 20px 0; font-size: 1.25rem; color: #1e293b; font-weight: 600; display: flex; align-items: center; gap: 12px; }
-        
         .input-group { margin-bottom: 15px; }
         label { font-size: 0.75rem; font-weight: 700; color: #64748b; display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
         
@@ -52,7 +52,7 @@
         }
         .btn-filter:hover { background: #1d4ed8; transform: translateY(-1px); }
 
-        /* Popups Estilo Moderno */
+        /* Popups */
         .leaflet-popup-content-wrapper { border-radius: 18px; padding: 5px; box-shadow: var(--shadow); }
         .popup-container { width: 300px; max-height: 400px; overflow-y: auto; padding: 10px; }
         
@@ -70,6 +70,7 @@
         }
         .child-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--primary); }
         .child-card.anemia-alert::before { background: var(--danger); }
+        .child-card.ina-alert { border: 2px solid var(--warning); } /* Borde naranja para inasistentes */
 
         .status-badge { 
             margin-top: 10px; padding: 6px 10px; border-radius: 8px;
@@ -77,6 +78,7 @@
         }
         .bg-red { background: #fef2f2; color: var(--danger); }
         .bg-green { background: #f0fdf4; color: var(--success); }
+        .bg-orange { background: #fff7ed; color: var(--warning); border: 1px solid #ffedd5; }
     </style>
 </head>
 <body>
@@ -105,8 +107,7 @@
 <div id="map"></div>
 
 <script>
-    // URL DE TU WEB APP (APPS SCRIPT)
-    const URL_API = "https://script.google.com/macros/s/AKfycbzQtTigeMwwQVBmcjSrrY1R2P-eE8iLinNakwlysAGCFuR3ykA69CajF1_djw2VVDza/exec"; 
+    const URL_API = "https://script.google.com/macros/s/AKfycbxKJELJCp9Sn3uXYVdBPajWa2XKHfQEZJkkk_UC2zu87KQNyPdFlLtwC4N8ltrhkGZa/exec"; 
 
     const satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { attribution: '© Google Maps' });
     const map = L.map('map', { center: [-9.2938, -75.9926], zoom: 15, layers: [satellite], zoomControl: false });
@@ -114,7 +115,6 @@
 
     let markersLayer = L.layerGroup().addTo(map);
 
-    // FUNCIÓN DE FECHA ROBUSTA
     function parseDate(val) {
         if (!val || val === "" || String(val).includes("#")) return null;
         if (!isNaN(val) && typeof val === 'number') return new Date((val - 25569) * 86400 * 1000);
@@ -131,7 +131,6 @@
         return new Date(s);
     }
 
-    // CÁLCULO DE EDAD EXACTA
     function calcularEdad(fechaNacStr) {
         const f = parseDate(fechaNacStr);
         if (!f || isNaN(f.getTime())) return "S/D";
@@ -179,7 +178,9 @@
             for (const coord in grupos) {
                 const personas = grupos[coord];
                 const latlng = coord.split(",").map(Number);
-                const tieneAnemia = personas.some(p => p.anemia && p.anemia !== "" && p.anemia !== "0");
+                
+                // Un marcador es rojo si algún niño tiene anemia O es inasistente crítico
+                const tieneAlerta = personas.some(p => (p.anemia && p.anemia !== "" && p.anemia !== "0") || p.citaFaltante);
 
                 let html = `<div class="popup-container">
                     <div class="header-vivienda">
@@ -190,7 +191,10 @@
 
                 personas.forEach(p => {
                     const esAnemico = p.anemia && p.anemia !== "" && p.anemia !== "0";
+                    const esInasistente = p.citaFaltante !== null;
+                    
                     let badge = `<div class="status-badge bg-green"><i class="fas fa-check-circle"></i> Protegido</div>`;
+                    let inasistenciaHtml = "";
                     
                     if (esAnemico) {
                         const fDiag = parseDate(p.anemia);
@@ -203,17 +207,26 @@
                         badge = `<div class="status-badge bg-red"><i class="fas fa-exclamation-triangle"></i> ANEMIA (${p.anemia})${alta}</div>`;
                     }
 
-                    html += `<div class="child-card ${esAnemico ? 'anemia-alert' : ''}">
+                    if (esInasistente) {
+                        inasistenciaHtml = `
+                        <div class="status-badge bg-orange" style="display:block; width:100%; margin-top:5px; box-sizing:border-box;">
+                            <i class="fas fa-calendar-times"></i> <b>INASISTENTE</b><br>
+                            <span style="font-size:0.7rem; font-weight:400">Cita perdida: ${p.citaFaltante}</span>
+                        </div>`;
+                    }
+
+                    html += `<div class="child-card ${esAnemico ? 'anemia-alert' : ''} ${esInasistente ? 'ina-alert' : ''}">
                         <span style="font-weight:600; color:#1e293b">👶 ${p.nombreHijo}</span><br>
                         <span style="font-size:0.8rem; color:#64748b"><i class="fas fa-birthday-cake"></i> ${calcularEdad(p.nacimientoHijo)}</span>
                         ${badge}
+                        ${inasistenciaHtml}
                     </div>`;
                 });
 
                 html += `</div>`;
                 
                 L.marker(latlng, { icon: new L.Icon({
-                    iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${tieneAnemia ? 'red' : 'blue'}.png`,
+                    iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${tieneAlerta ? 'red' : 'blue'}.png`,
                     iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
                 })}).bindPopup(html).addTo(markersLayer);
             }
