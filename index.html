@@ -15,110 +15,140 @@
             --primary: #2563eb;
             --danger: #ef4444;
             --success: #22c55e;
-            --warning: #f97316; /* Color para inasistentes */
-            --glass: rgba(255, 255, 255, 0.9);
-            --shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            --warning: #f97316;
+            --glass: rgba(255, 255, 255, 0.95);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
         }
 
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Inter', sans-serif; background: #f0f2f5; overflow: hidden; }
         #map { height: 100vh; width: 100%; z-index: 1; }
 
-        /* Panel Lateral */
+        /* Panel Lateral Retráctil */
         .search-panel {
-            position: absolute; top: 20px; left: 20px; z-index: 1000;
-            background: var(--glass);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            padding: 24px; border-radius: 20px;
-            box-shadow: var(--shadow); width: 320px;
-            border: 1px solid rgba(255, 255, 255, 0.4);
+            position: absolute; top: 0; left: 0; bottom: 0; z-index: 1010;
+            background: var(--glass); backdrop-filter: blur(15px);
+            padding: 24px; width: 300px;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow);
+            overflow-y: auto;
+            border-right: 1px solid rgba(0,0,0,0.1);
         }
+        
+        .search-panel.hidden { transform: translateX(-100%); }
+
+        /* Botón de control del panel */
+        .toggle-btn {
+            position: absolute; top: 15px; left: 15px; z-index: 1020;
+            background: var(--primary); color: white;
+            border: none; width: 45px; height: 45px; border-radius: 12px;
+            cursor: pointer; box-shadow: var(--shadow);
+            display: flex; align-items: center; justify-content: center;
+            transition: left 0.3s ease;
+        }
+        .search-panel:not(.hidden) + .toggle-btn { left: 315px; }
 
         h2 { margin: 0 0 20px 0; font-size: 1.25rem; color: #1e293b; font-weight: 600; display: flex; align-items: center; gap: 12px; }
-        .input-group { margin-bottom: 15px; }
-        label { font-size: 0.75rem; font-weight: 700; color: #64748b; display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        label { font-size: 0.7rem; font-weight: 700; color: #64748b; display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
         
-        input[type="date"] { 
-            width: 100%; padding: 12px; box-sizing: border-box;
-            border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; 
-            font-family: inherit; font-size: 0.9rem; background: white;
+        .search-input {
+            width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0;
+            margin-bottom: 15px; font-family: inherit; font-size: 0.9rem; box-sizing: border-box;
         }
+
+        /* Grid de Filtros Rápidos */
+        .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+        .btn-quick {
+            padding: 8px; font-size: 0.65rem; border-radius: 8px; border: 1px solid #e2e8f0;
+            background: white; cursor: pointer; font-weight: 700; color: #475569;
+            transition: all 0.2s; text-align: center;
+        }
+        .btn-quick.active { background: var(--primary); color: white; border-color: var(--primary); }
 
         .btn-filter { 
             width: 100%; background: var(--primary);
             color: white; border: none; padding: 14px; border-radius: 12px; 
             cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;
-            transition: all 0.3s;
         }
-        .btn-filter:hover { background: #1d4ed8; transform: translateY(-1px); }
 
-        /* Popups */
-        .leaflet-popup-content-wrapper { border-radius: 18px; padding: 5px; box-shadow: var(--shadow); }
-        .popup-container { width: 300px; max-height: 400px; overflow-y: auto; padding: 10px; }
-        
+        /* Popups y Cards */
+        .popup-container { width: 280px; max-height: 350px; overflow-y: auto; }
         .header-vivienda { 
-            padding: 12px; background: #f8fafc; border-radius: 14px; margin-bottom: 12px;
-            border: 1px solid #e2e8f0;
+            padding: 10px; background: #f8fafc; border-radius: 12px; margin-bottom: 10px; border: 1px solid #e2e8f0;
         }
-        .header-vivienda b { color: #0f172a; display: block; font-size: 1rem; }
-        .header-vivienda small { color: #64748b; font-size: 0.7rem; }
+        .header-vivienda b { color: #0f172a; display: block; font-size: 0.95rem; }
+        .header-vivienda small { color: #64748b; font-size: 0.75rem; display: block; margin-top: 2px; }
 
         .child-card { 
-            background: white; padding: 15px; border-radius: 14px; 
-            margin-bottom: 12px; border: 1px solid #f1f5f9;
-            position: relative; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            background: white; padding: 12px; border-radius: 12px; 
+            margin-bottom: 10px; border: 1px solid #f1f5f9;
+            position: relative; overflow: hidden;
         }
-        .child-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--primary); }
+        .child-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--primary); }
         .child-card.anemia-alert::before { background: var(--danger); }
-        .child-card.ina-alert { border: 2px solid var(--warning); } /* Borde naranja para inasistentes */
+        .child-card.ina-alert { border: 2px solid var(--warning); }
 
         .status-badge { 
-            margin-top: 10px; padding: 6px 10px; border-radius: 8px;
-            font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;
+            margin-top: 8px; padding: 5px 8px; border-radius: 6px;
+            font-size: 0.7rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;
         }
         .bg-red { background: #fef2f2; color: var(--danger); }
         .bg-green { background: #f0fdf4; color: var(--success); }
-        .bg-orange { background: #fff7ed; color: var(--warning); border: 1px solid #ffedd5; }
+        .bg-orange { background: #fff7ed; color: var(--warning); border: 1px solid #ffedd5; width: 100%; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
-<div class="search-panel">
+<div class="search-panel" id="sidePanel">
     <h2><i class="fas fa-satellite-dish" style="color:var(--primary)"></i> GeoBoy Pro</h2>
     
-    <div class="input-group">
-        <label>Desde el nacimiento</label>
-        <input type="date" id="dateStart">
+    <label>Búsqueda por DNI Niño</label>
+    <input type="text" id="dniSearch" class="search-input" placeholder="Escriba DNI..." oninput="applyFilters()">
+
+    <label>Filtros de Inasistencia</label>
+    <div class="filter-grid">
+        <button class="btn-quick" id="btn-anemia" onclick="toggleFilter('anemia')">INAS. ANEMIA</button>
+        <button class="btn-quick" id="btn-cred" onclick="toggleFilter('cred')">INAS. CRED</button>
+        <button class="btn-quick" id="btn-vacuna" onclick="toggleFilter('vacuna')">INAS. VACUNA</button>
+        <button class="btn-quick" onclick="resetFilters()" style="background:#f1f5f9">LIMPIAR</button>
     </div>
-    <div class="input-group">
-        <label>Hasta el nacimiento</label>
-        <input type="date" id="dateEnd">
-    </div>
+
+    <label>Rango de Nacimiento</label>
+    <input type="date" id="dateStart" class="search-input" style="margin-bottom:8px">
+    <input type="date" id="dateEnd" class="search-input">
     
-    <button class="btn-filter" onclick="loadMarkers()">
-        <i class="fas fa-sync-alt"></i> Sincronizar Mapa
+    <button class="btn-filter" onclick="fetchData()">
+        <i class="fas fa-sync-alt"></i> Sincronizar Datos
     </button>
     
-    <div id="stats" style="margin-top:15px; font-size:0.8rem; text-align:center; color:#64748b;">
-        Esperando sincronización...
+    <div id="stats" style="margin-top:15px; font-size:0.75rem; text-align:center; color:#64748b;">
+        Cargando mapa...
     </div>
 </div>
+
+<button class="toggle-btn" onclick="togglePanel()">
+    <i class="fas fa-bars"></i>
+</button>
 
 <div id="map"></div>
 
 <script>
-    const URL_API = "https://script.google.com/macros/s/AKfycbxKJELJCp9Sn3uXYVdBPajWa2XKHfQEZJkkk_UC2zu87KQNyPdFlLtwC4N8ltrhkGZa/exec"; 
-
+    const URL_API = "https://script.google.com/macros/s/AKfycbzQtTigeMwwQVBmcjSrrY1R2P-eE8iLinNakwlysAGCFuR3ykA69CajF1_djw2VVDza/exec"; 
+    
     const satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { attribution: '© Google Maps' });
     const map = L.map('map', { center: [-9.2938, -75.9926], zoom: 15, layers: [satellite], zoomControl: false });
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     let markersLayer = L.layerGroup().addTo(map);
+    let rawData = [];
+    let activeFilters = { anemia: false, cred: false, vacuna: false };
+
+    function togglePanel() {
+        document.getElementById('sidePanel').classList.toggle('hidden');
+    }
 
     function parseDate(val) {
         if (!val || val === "" || String(val).includes("#")) return null;
         if (!isNaN(val) && typeof val === 'number') return new Date((val - 25569) * 86400 * 1000);
-        
         let s = String(val).trim();
         let parts = s.split(/[\/\-]/);
         if (parts.length === 3) {
@@ -138,10 +168,8 @@
         let anios = hoy.getFullYear() - f.getFullYear();
         let meses = hoy.getMonth() - f.getMonth();
         let dias = hoy.getDate() - f.getDate();
-
         if (dias < 0) { meses--; let ultDia = new Date(hoy.getFullYear(), hoy.getMonth(), 0).getDate(); dias += ultDia; }
         if (meses < 0) { anios--; meses += 12; }
-
         let texto = "";
         if (anios > 0) texto += anios + (anios === 1 ? " año, " : " años, ");
         texto += meses + (meses === 1 ? " mes y " : " meses y ");
@@ -149,94 +177,119 @@
         return texto;
     }
 
-    async function loadMarkers() {
+    async function fetchData() {
+        document.getElementById('stats').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sincronizando...';
+        try {
+            const response = await fetch(URL_API);
+            rawData = await response.json();
+            applyFilters();
+        } catch (e) {
+            document.getElementById('stats').innerText = "Error de conexión.";
+        }
+    }
+
+    function toggleFilter(type) {
+        activeFilters[type] = !activeFilters[type];
+        document.getElementById('btn-' + type).classList.toggle('active');
+        applyFilters();
+    }
+
+    function resetFilters() {
+        activeFilters = { anemia: false, cred: false, vacuna: false };
+        document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
+        document.getElementById('dniSearch').value = '';
+        applyFilters();
+    }
+
+    function applyFilters() {
+        markersLayer.clearLayers();
+        const dniTerm = document.getElementById('dniSearch').value.trim().toLowerCase();
         const startStr = document.getElementById('dateStart').value;
         const endStr = document.getElementById('dateEnd').value;
         let dStart = startStr ? new Date(startStr + "T00:00:00") : null;
         let dEnd = endStr ? new Date(endStr + "T23:59:59") : null;
 
-        markersLayer.clearLayers();
-        document.getElementById('stats').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando...';
+        const grupos = {};
+        let contadorNiños = 0;
 
-        try {
-            const response = await fetch(URL_API);
-            const data = await response.json();
-            const grupos = {};
-            let totalNiños = 0;
+        rawData.forEach(item => {
+            // Filtro por Fecha de Nacimiento
+            const fNac = parseDate(item.nacimientoHijo);
+            if (dStart && fNac && fNac < dStart) return;
+            if (dEnd && fNac && fNac > dEnd) return;
 
-            data.forEach(item => {
-                if (!item.coords) return;
-                const fNac = parseDate(item.nacimientoHijo);
-                if (dStart && fNac && fNac < dStart) return;
-                if (dEnd && fNac && fNac > dEnd) return;
+            // Filtro por DNI
+            if (dniTerm && !String(item.dniHijo).includes(dniTerm)) return;
+
+            // Filtros de Inasistencia
+            if (activeFilters.anemia && !item.citaFaltante) return;
+            // (Nota: CRED y VACUNA se activarán cuando el script envíe citaCred o citaVacuna)
+            if (activeFilters.cred && !item.citaCred) return; 
+            if (activeFilters.vacuna && !item.citaVacuna) return;
+
+            if (!grupos[item.coords]) grupos[item.coords] = [];
+            grupos[item.coords].push(item);
+            contadorNiños++;
+        });
+
+        for (const coord in grupos) {
+            const personas = grupos[coord];
+            const latlng = coord.split(",").map(Number);
+            const tieneAlerta = personas.some(p => (p.anemia && p.anemia !== "" && p.anemia !== "0") || p.citaFaltante);
+
+            let html = `<div class="popup-container">
+                <div class="header-vivienda">
+                    <small>MADRE</small>
+                    <b>${personas[0].nombreMadre}</b>
+                    <small><i class="fas fa-phone"></i> Cel: ${personas[0].celular || 'No registrado'}</small>
+                    <small><i class="fas fa-map-marker-alt"></i> ${personas[0].domicilio || 'Sin dirección'}</small>
+                </div>`;
+
+            personas.forEach(p => {
+                const esAnemico = p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0";
+                const esInasistenteAnemia = p.citaFaltante !== null;
                 
-                if (!grupos[item.coords]) grupos[item.coords] = [];
-                grupos[item.coords].push(item);
-                totalNiños++;
+                let badge = `<div class="status-badge bg-green"><i class="fas fa-check-circle"></i> Protegido</div>`;
+                let inasistenciaHtml = "";
+                
+                if (esAnemico) {
+                    const fDiag = parseDate(p.anemia);
+                    let alta = "";
+                    if (fDiag) {
+                        let fAlta = new Date(fDiag);
+                        fAlta.setMonth(fAlta.getMonth() + 7);
+                        alta = `<br><span style="font-size:0.65rem; font-weight:400">📅 Alta: ${fAlta.toLocaleDateString('es-PE')}</span>`;
+                    }
+                    badge = `<div class="status-badge bg-red"><i class="fas fa-exclamation-triangle"></i> ANEMIA (${p.anemia})${alta}</div>`;
+                }
+
+                if (esInasistenteAnemia) {
+                    inasistenciaHtml = `
+                    <div class="status-badge bg-orange">
+                        <i class="fas fa-calendar-times"></i> <b>INASISTENTE ANEMIA</b><br>
+                        Cita: ${p.citaFaltante}
+                    </div>`;
+                }
+
+                html += `<div class="child-card ${esAnemico ? 'anemia-alert' : ''} ${esInasistenteAnemia ? 'ina-alert' : ''}">
+                    <span style="font-weight:600; color:#1e293b">👶 ${p.nombreHijo}</span><br>
+                    <span style="font-size:0.75rem; color:#64748b"><i class="fas fa-birthday-cake"></i> ${calcularEdad(p.nacimientoHijo)}</span>
+                    ${badge}
+                    ${inasistenciaHtml}
+                </div>`;
             });
 
-            for (const coord in grupos) {
-                const personas = grupos[coord];
-                const latlng = coord.split(",").map(Number);
-                
-                // Un marcador es rojo si algún niño tiene anemia O es inasistente crítico
-                const tieneAlerta = personas.some(p => (p.anemia && p.anemia !== "" && p.anemia !== "0") || p.citaFaltante);
-
-                let html = `<div class="popup-container">
-                    <div class="header-vivienda">
-                        <small>MADRE</small>
-                        <b>${personas[0].nombreMadre}</b>
-                        <small><i class="fas fa-map-marker-alt"></i> ${personas[0].domicilio || 'Sin dirección'}</small>
-                    </div>`;
-
-                personas.forEach(p => {
-                    const esAnemico = p.anemia && p.anemia !== "" && p.anemia !== "0";
-                    const esInasistente = p.citaFaltante !== null;
-                    
-                    let badge = `<div class="status-badge bg-green"><i class="fas fa-check-circle"></i> Protegido</div>`;
-                    let inasistenciaHtml = "";
-                    
-                    if (esAnemico) {
-                        const fDiag = parseDate(p.anemia);
-                        let alta = "";
-                        if (fDiag) {
-                            let fAlta = new Date(fDiag);
-                            fAlta.setMonth(fAlta.getMonth() + 7);
-                            alta = `<br><span style="font-size:0.7rem; font-weight:400">📅 Alta: ${fAlta.toLocaleDateString('es-PE')}</span>`;
-                        }
-                        badge = `<div class="status-badge bg-red"><i class="fas fa-exclamation-triangle"></i> ANEMIA (${p.anemia})${alta}</div>`;
-                    }
-
-                    if (esInasistente) {
-                        inasistenciaHtml = `
-                        <div class="status-badge bg-orange" style="display:block; width:100%; margin-top:5px; box-sizing:border-box;">
-                            <i class="fas fa-calendar-times"></i> <b>INASISTENTE</b><br>
-                            <span style="font-size:0.7rem; font-weight:400">Cita perdida: ${p.citaFaltante}</span>
-                        </div>`;
-                    }
-
-                    html += `<div class="child-card ${esAnemico ? 'anemia-alert' : ''} ${esInasistente ? 'ina-alert' : ''}">
-                        <span style="font-weight:600; color:#1e293b">👶 ${p.nombreHijo}</span><br>
-                        <span style="font-size:0.8rem; color:#64748b"><i class="fas fa-birthday-cake"></i> ${calcularEdad(p.nacimientoHijo)}</span>
-                        ${badge}
-                        ${inasistenciaHtml}
-                    </div>`;
-                });
-
-                html += `</div>`;
-                
-                L.marker(latlng, { icon: new L.Icon({
-                    iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${tieneAlerta ? 'red' : 'blue'}.png`,
-                    iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-                })}).bindPopup(html).addTo(markersLayer);
-            }
-            document.getElementById('stats').innerText = `${totalNiños} niños monitoreados.`;
-        } catch (e) {
-            document.getElementById('stats').innerText = "Error de sincronización.";
+            html += `</div>`;
+            
+            L.marker(latlng, { icon: new L.Icon({
+                iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${tieneAlerta ? 'red' : 'blue'}.png`,
+                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+            })}).bindPopup(html).addTo(markersLayer);
         }
+        document.getElementById('stats').innerText = `${contadorNiños} niños encontrados.`;
     }
 
-    loadMarkers();
+    fetchData();
 </script>
 </body>
 </html>
