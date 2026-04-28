@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoBoy - Control Epidemiológico Castillo Grande</title>
+    <title>GeoBoy - Sistema de Monitoreo Castillo Grande</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
@@ -14,7 +15,7 @@
         body { font-family: 'Poppins', sans-serif; margin: 0; padding: 0; background-color: #f8fafc; }
         #map { height: 100vh; width: 100%; z-index: 1; }
 
-        /* Panel de Control */
+        /* Panel Lateral */
         .search-panel {
             position: absolute; top: 20px; left: 20px; z-index: 1000;
             background: white; padding: 20px; border-radius: 15px;
@@ -22,7 +23,7 @@
             border: 1px solid #e2e8f0;
         }
 
-        h2 { margin: 0 0 15px 0; font-size: 1.2em; color: #4338ca; display: flex; align-items: center; gap: 10px; }
+        h2 { margin: 0 0 15px 0; font-size: 1.2em; color: #1e40af; display: flex; align-items: center; gap: 10px; }
         label { font-size: 0.8em; font-weight: 600; color: #64748b; display: block; margin-top: 12px; }
         input { 
             width: 100%; padding: 10px; margin-top: 5px; 
@@ -31,17 +32,17 @@
         }
         
         .btn-filter { 
-            width: 100%; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            width: 100%; background: #1e40af;
             color: white; border: none; padding: 12px; border-radius: 10px; 
             cursor: pointer; font-weight: 600; margin-top: 20px;
-            transition: transform 0.2s;
+            transition: background 0.3s;
         }
-        .btn-filter:active { transform: scale(0.98); }
+        .btn-filter:hover { background: #1e3a8a; }
 
-        /* Estilos de los Popups */
+        /* Estilos de Etiquetas en el Mapa */
         .child-tag { 
             background: #f8fafc; padding: 12px; border-radius: 10px; 
-            margin-top: 8px; font-size: 0.9em; border-left: 5px solid #6366f1;
+            margin-top: 8px; font-size: 0.9em; border-left: 5px solid #3b82f6;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
         .anemia-alert { 
@@ -49,9 +50,9 @@
         }
         .anemia-text { 
             color: #b91c1c; font-weight: 700; display: block; margin-top: 4px;
-            font-size: 0.85em; text-transform: uppercase;
+            font-size: 0.85em;
         }
-        .alta-date { color: #15803d; font-weight: 600; font-size: 0.85em; }
+        .alta-date { color: #15803d; font-weight: 600; font-size: 0.85em; display: block; margin-top: 2px; }
         
         #stats { 
             margin-top: 15px; font-size: 0.75em; color: #94a3b8; 
@@ -62,27 +63,30 @@
 <body>
 
 <div class="search-panel">
-    <h2><i class="fas fa-file-medical"></i> Monitor de Salud</h2>
+    <h2><i class="fas fa-map-marker-alt"></i> Filtro de Búsqueda</h2>
     
-    <label><i class="fas fa-calendar-alt"></i> Nacidos desde:</label>
+    <label>Nacidos desde:</label>
     <input type="date" id="dateStart">
     
-    <label><i class="fas fa-calendar-check"></i> Nacidos hasta:</label>
+    <label>Nacidos hasta:</label>
     <input type="date" id="dateEnd">
     
-    <button class="btn-filter" onclick="loadMarkers()">Actualizar Visualización</button>
-    <div id="stats">Iniciando sistema...</div>
+    <button class="btn-filter" onclick="loadMarkers()">Filtrar Niños</button>
+    <div id="stats">Cargando base de datos...</div>
 </div>
 
 <div id="map"></div>
 
 <script>
-    // Inicialización del mapa
+    // Configuración de URL - REEMPLAZAR CON TU NUEVA URL DE IMPLEMENTACIÓN
+    const URL_API = "TU_URL_DE_APPS_SCRIPT_AQUI";
+
+    // Inicializar Mapa
     const map = L.map('map').setView([-9.2938, -75.9926], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     let markersLayer = L.layerGroup().addTo(map);
 
-    // Iconos de estado
+    // Iconos
     const redIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
         iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
@@ -93,10 +97,11 @@
         iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
     });
 
-    // MOTOR DE FECHAS MEJORADO
+    // Función para procesar fechas del Excel
     function parseRobustDate(val) {
-        if (!val || val === "" || String(val).includes("#") || val === 0) return null;
+        if (!val || val === "" || String(val).includes("#")) return null;
         
+        // Si es número de Excel
         if (!isNaN(val) && typeof val === 'number') {
             return new Date((val - 25569) * 86400 * 1000);
         }
@@ -115,24 +120,24 @@
         return isNaN(nativeDate.getTime()) ? null : nativeDate;
     }
 
-    // CÁLCULO DE EDAD CORREGIDO (Años y Meses)
+    // Cálculo de Edad Exacta
     function getEdad(fechaNacStr) {
         const f = parseRobustDate(fechaNacStr);
         if (!f) return "S/D";
         const hoy = new Date();
         
-        let edadAnios = hoy.getFullYear() - f.getFullYear();
-        let edadMeses = hoy.getMonth() - f.getMonth();
+        let anios = hoy.getFullYear() - f.getFullYear();
+        let meses = hoy.getMonth() - f.getMonth();
         
-        if (edadMeses < 0 || (edadMeses === 0 && hoy.getDate() < f.getDate())) {
-            edadAnios--;
-            edadMeses += 12;
+        if (meses < 0 || (meses === 0 && hoy.getDate() < f.getDate())) {
+            anios--;
+            meses += 12;
         }
 
-        if (edadAnios < 1) {
-            return edadMeses + (edadMeses === 1 ? " mes" : " meses");
+        if (anios < 1) {
+            return meses + (meses === 1 ? " mes" : " meses");
         } else {
-            return edadAnios + (edadAnios === 1 ? " año" : " años") + (edadMeses > 0 ? " y " + edadMeses + " m" : "");
+            return anios + (anios === 1 ? " año" : " años") + (meses > 0 ? " y " + meses + " m" : "");
         }
     }
 
@@ -143,18 +148,13 @@
         const dEnd = endStr ? new Date(endStr + "T23:59:59") : null;
 
         markersLayer.clearLayers();
-        document.getElementById('stats').innerText = "Sincronizando datos manuales...";
-
-        // URL de tu Script de Google
-        const URL_API = "https://script.google.com/macros/s/AKfycbyXn_7STdNy6TtK0WsOKGSrWRWg-cN-btfuuJVI2mgI_J9HVHyPfkgl0Kt1-iJ4Cxk/exec";
+        document.getElementById('stats').innerText = "Sincronizando con Excel...";
 
         try {
             const response = await fetch(URL_API);
             const data = await response.json();
             const grupos = {};
-            let matchCount = 0;
 
-            // Agrupación por coordenadas
             data.forEach(item => {
                 if (!item.coords || String(item.coords).includes("#")) return;
 
@@ -164,39 +164,38 @@
 
                 if (!grupos[item.coords]) grupos[item.coords] = [];
                 grupos[item.coords].push(item);
-                matchCount++;
             });
 
             for (const coord in grupos) {
                 const personas = grupos[coord];
                 const latlng = coord.split(",").map(Number);
-                if (isNaN(latlng[0])) continue;
-
-                // DETECCIÓN DE ANEMIA MANUAL (Si hay algo escrito en la columna O)
+                
+                // DETECCIÓN DE ANEMIA: Revisa si algún niño en la casa tiene dato en columna O
                 const tieneAnemiaEnCasa = personas.some(p => {
-                    const val = p.anemia || p.Anemia; // Soporta ambas mayúsculas/minúsculas
-                    return val && String(val).trim() !== "" && String(val).trim() !== "0";
+                    const val = p.anemia || "";
+                    return val.toString().trim() !== "" && val.toString().trim() !== "0";
                 });
                 
                 let html = `<div style="min-width:240px">
-                            <b style="color:#1e293b">📍 Ubicación Registrada</b><br>
-                            <small>Integrantes en este punto: ${personas.length}</small><hr style="border:0; border-top:1px solid #eee; margin:10px 0">`;
+                            <b style="color:#1e40af">📍 Ubicación Registrada</b><br>
+                            <small>Niños en este punto: ${personas.length}</small><hr style="border:0; border-top:1px solid #eee; margin:10px 0">`;
                 
                 personas.forEach(p => {
-                    const valAnemia = (p.anemia || p.Anemia || "").toString().trim();
+                    const valAnemia = (p.anemia || "").toString().trim();
                     const esAnemico = valAnemia !== "" && valAnemia !== "0";
-                    const fDiag = parseRobustDate(valAnemia);
                     
                     let detalle = "<span style='color:#15803d'>✅ Sin anemia</span>";
+                    
                     if (esAnemico) {
+                        const fDiag = parseRobustDate(valAnemia);
                         let altaStr = "Fecha de alta: Pendiente";
                         if (fDiag) {
                             let fAlta = new Date(fDiag);
-                            fAlta.setMonth(fAlta.getMonth() + 6);
-                            altaStr = "Alta Médica (6m): " + fAlta.toLocaleDateString('es-PE');
+                            fAlta.setMonth(fAlta.getMonth() + 7); // Cálculo a 7 meses (alta médica)
+                            altaStr = "Alta Sugerida: " + fAlta.toLocaleDateString('es-PE');
                         }
                         detalle = `
-                            <span class="anemia-text">⚠️ Caso de Anemia</span>
+                            <span class="anemia-text">⚠️ CASO DE ANEMIA</span>
                             <b>Diagnóstico:</b> ${valAnemia}<br>
                             <span class="alta-date">📅 ${altaStr}</span>
                         `;
@@ -217,14 +216,15 @@
                  .addTo(markersLayer);
             }
 
-            document.getElementById('stats').innerText = `Mostrando ${matchCount} niños en el mapa.`;
+            document.getElementById('stats').innerText = "Mapa actualizado correctamente.";
 
         } catch (e) {
-            document.getElementById('stats').innerText = "Error al conectar con Google Sheets.";
+            document.getElementById('stats').innerText = "Error: Verifica la URL del Script.";
             console.error(e);
         }
     }
 
+    // Carga inicial
     loadMarkers();
 </script>
 
