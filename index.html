@@ -29,14 +29,11 @@
             background: var(--glass); backdrop-filter: blur(15px);
             padding: 24px; width: 310px;
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: var(--shadow);
-            overflow-y: auto;
+            box-shadow: var(--shadow); overflow-y: auto;
             border-right: 1px solid rgba(0,0,0,0.1);
         }
-        
         .search-panel.hidden { transform: translateX(-100%); }
 
-        /* Botón de control */
         .toggle-btn {
             position: absolute; top: 15px; left: 15px; z-index: 1020;
             background: var(--primary); color: white;
@@ -53,7 +50,6 @@
         .search-input {
             width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0;
             margin-bottom: 15px; font-family: inherit; font-size: 0.9rem; box-sizing: border-box;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
         }
 
         .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
@@ -65,13 +61,12 @@
         .btn-quick.active { background: var(--primary); color: white; border-color: var(--primary); }
 
         .btn-filter { 
-            width: 100%; background: var(--primary);
-            color: white; border: none; padding: 14px; border-radius: 12px; 
-            cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+            width: 100%; background: var(--primary); color: white; border: none; padding: 14px; 
+            border-radius: 12px; cursor: pointer; font-weight: 600; 
+            display: flex; align-items: center; justify-content: center; gap: 8px;
         }
 
-        /* Estilos de los Popups */
+        /* Estilos Popups */
         .popup-container { width: 280px; max-height: 400px; overflow-y: auto; padding: 5px; }
         .header-vivienda { 
             padding: 10px; background: #f8fafc; border-radius: 12px; margin-bottom: 10px; border: 1px solid #e2e8f0;
@@ -115,14 +110,14 @@
         <button class="btn-quick" onclick="resetFilters()" style="background:#f1f5f9">LIMPIAR</button>
     </div>
 
-    <label>Fecha de Nacimiento</label>
+    <label>Rango de Nacimiento</label>
     <div style="display: flex; gap: 5px;">
         <input type="date" id="dateStart" class="search-input" onchange="applyFilters()">
         <input type="date" id="dateEnd" class="search-input" onchange="applyFilters()">
     </div>
     
     <button class="btn-filter" onclick="fetchData()">
-        <i class="fas fa-sync-alt"></i> Actualizar desde Excel
+        <i class="fas fa-sync-alt"></i> Sincronizar Excel
     </button>
     
     <div id="stats" style="margin-top:15px; font-size:0.75rem; text-align:center; color:#64748b; font-weight: 600;">
@@ -130,9 +125,7 @@
     </div>
 </div>
 
-<button class="toggle-btn" onclick="togglePanel()">
-    <i class="fas fa-bars"></i>
-</button>
+<button class="toggle-btn" onclick="togglePanel()"><i class="fas fa-bars"></i></button>
 
 <div id="map"></div>
 
@@ -147,9 +140,7 @@
     let rawData = [];
     let activeFilters = { anemia: false, cred: false, vacuna: false };
 
-    function togglePanel() {
-        document.getElementById('sidePanel').classList.toggle('hidden');
-    }
+    function togglePanel() { document.getElementById('sidePanel').classList.toggle('hidden'); }
 
     function parseDate(val) {
         if (!val || String(val).includes("#") || String(val).trim() === "" || val === 0 || val === "0") return null;
@@ -176,10 +167,7 @@
         let dias = hoy.getDate() - f.getDate();
         if (dias < 0) { meses--; let ultDia = new Date(hoy.getFullYear(), hoy.getMonth(), 0).getDate(); dias += ultDia; }
         if (meses < 0) { anios--; meses += 12; }
-        let texto = "";
-        if (anios > 0) texto += anios + "a ";
-        texto += meses + "m " + dias + "d";
-        return texto;
+        return `${anios > 0 ? anios + "a " : ""}${meses}m ${dias}d`;
     }
 
     async function fetchData() {
@@ -188,9 +176,7 @@
             const response = await fetch(URL_API);
             rawData = await response.json();
             applyFilters();
-        } catch (e) {
-            document.getElementById('stats').innerText = "Error de conexión.";
-        }
+        } catch (e) { document.getElementById('stats').innerText = "Error de conexión."; }
     }
 
     function toggleFilter(type) {
@@ -218,19 +204,17 @@
         let contadorNiños = 0;
 
         rawData.forEach(item => {
-            // Filtro de Fechas
             const fNac = parseDate(item.nacimientoHijo);
             if (dStart && fNac && fNac < dStart) return;
             if (dEnd && fNac && fNac > dEnd) return;
 
-            // Filtro de Búsqueda (DNI, Madre, Hijo)
             const matchSearch = !term || 
                 String(item.dniHijo).includes(term) || 
                 item.nombreHijo.toLowerCase().includes(term) || 
                 item.nombreMadre.toLowerCase().includes(term);
             if (!matchSearch) return;
 
-            // Filtros de Inasistencia
+            // FILTROS INDIVIDUALES POR TIPO DE INASISTENCIA
             if (activeFilters.anemia && !item.citaFaltante) return;
             if (activeFilters.cred && !item.citaCred) return; 
             if (activeFilters.vacuna && !item.citaVacuna) return;
@@ -244,10 +228,9 @@
             const personas = grupos[coord];
             const latlng = coord.split(",").map(Number);
             
-            // Lógica de alerta para el color del marcador
             const tieneAlerta = personas.some(p => {
                 const esAnemicoReal = p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0" && !String(p.anemia).includes("#");
-                return esAnemicoReal || p.citaFaltante;
+                return esAnemicoReal || p.citaFaltante || p.citaCred || p.citaVacuna;
             });
 
             let html = `<div class="popup-container">
@@ -255,52 +238,54 @@
                     <small>RESPONSABLE</small>
                     <b>${personas[0].nombreMadre}</b>
                     <div class="info-row"><i class="fas fa-phone"></i> Cel: ${personas[0].celular || 'S/N'}</div>
-                    <div class="info-row"><i class="fas fa-home"></i> ${personas[0].domicilio || 'Sin dirección'}</div>
+                    <div class="info-row"><i class="fas fa-home"></i> ${personas[0].domicilio || 'S/D'}</div>
                 </div>`;
 
             personas.forEach(p => {
                 const esAnemico = p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0" && !String(p.anemia).includes("#");
-                const esInasistenteAnemia = p.citaFaltante !== null && p.citaFaltante !== undefined;
                 
-                let anemiaHtml = ""; 
+                let badgesHtml = "";
+                
+                // Badge de Anemia Activa
                 if (esAnemico) {
                     const fDiag = parseDate(p.anemia);
                     let alta = "";
                     if (fDiag) {
-                        let fAlta = new Date(fDiag);
-                        fAlta.setMonth(fAlta.getMonth() + 7);
+                        let fAlta = new Date(fDiag); fAlta.setMonth(fAlta.getMonth() + 7);
                         alta = `<br><span style="font-size:0.65rem; font-weight:400">📅 Alta: ${fAlta.toLocaleDateString('es-PE')}</span>`;
                     }
-                    anemiaHtml = `<div class="status-badge bg-red"><i class="fas fa-tint"></i> ANEMIA (${p.anemia})${alta}</div>`;
+                    badgesHtml += `<div class="status-badge bg-red"><i class="fas fa-tint"></i> ANEMIA (${p.anemia})${alta}</div>`;
                 }
 
-                let inasistenciaHtml = "";
-                if (esInasistenteAnemia) {
-                    inasistenciaHtml = `
-                    <div class="status-badge bg-orange">
-                        <i class="fas fa-calendar-times"></i> <b>INASISTENTE ANEMIA</b><br>
-                        Cita: ${p.citaFaltante}
-                    </div>`;
+                // Badge Inasistente Anemia (Hoja InaAnemia)
+                if (p.citaFaltante) {
+                    badgesHtml += `<div class="status-badge bg-orange"><i class="fas fa-calendar-times"></i> <b>INASISTENTE ANEMIA</b><br>Cita: ${p.citaFaltante}</div>`;
                 }
 
-                html += `<div class="child-card ${esAnemico ? 'anemia-alert' : ''} ${esInasistenteAnemia ? 'ina-alert' : ''}">
+                // Badge Inasistente CRED (Hoja InaCRED)
+                if (p.citaCred) {
+                    badgesHtml += `<div class="status-badge bg-orange" style="border-color:#3b82f6"><i class="fas fa-baby"></i> <b>INASISTENTE CRED</b><br>Cita: ${p.citaCred}</div>`;
+                }
+
+                // Badge Inasistente VACUNA (Hoja InaVacunas)
+                if (p.citaVacuna) {
+                    badgesHtml += `<div class="status-badge bg-orange" style="border-color:#22c55e"><i class="fas fa-syringe"></i> <b>INASISTENTE VACUNA</b><br>Cita: ${p.citaVacuna}</div>`;
+                }
+
+                html += `<div class="child-card ${esAnemico ? 'anemia-alert' : ''} ${(p.citaFaltante || p.citaCred || p.citaVacuna) ? 'ina-alert' : ''}">
                     <span style="font-weight:600; color:#1e293b">👶 ${p.nombreHijo}</span><br>
-                    <div class="info-row">DNI: ${p.dniHijo} | <i class="fas fa-birthday-cake"></i> ${calcularEdad(p.nacimientoHijo)}</div>
-                    ${anemiaHtml}
-                    ${inasistenciaHtml}
+                    <div class="info-row">DNI: ${p.dniHijo} | ${calcularEdad(p.nacimientoHijo)}</div>
+                    ${badgesHtml}
                 </div>`;
             });
 
-            html += `</div>`;
-            
             L.marker(latlng, { icon: new L.Icon({
                 iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${tieneAlerta ? 'red' : 'blue'}.png`,
-                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-            })}).bindPopup(html).addTo(markersLayer);
+                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
+            })}).bindPopup(html + "</div>").addTo(markersLayer);
         }
-        document.getElementById('stats').innerText = `${contadorNiños} niños en ${Object.keys(grupos).length} puntos.`;
+        document.getElementById('stats').innerText = `${contadorNiños} niños encontrados.`;
     }
-
     fetchData();
 </script>
 </body>
