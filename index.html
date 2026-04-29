@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoBoy Castillo - Monitor Pro</title>
+    <title>GeoBoy Castillo Grande - Monitor Pro</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -27,7 +27,7 @@
         .search-panel {
             position: absolute; top: 0; left: 0; bottom: 0; z-index: 1010;
             background: var(--glass); backdrop-filter: blur(15px);
-            padding: 24px; width: 300px;
+            padding: 24px; width: 310px;
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             box-shadow: var(--shadow);
             overflow-y: auto;
@@ -36,7 +36,7 @@
         
         .search-panel.hidden { transform: translateX(-100%); }
 
-        /* Botón de control del panel */
+        /* Botón de control */
         .toggle-btn {
             position: absolute; top: 15px; left: 15px; z-index: 1020;
             background: var(--primary); color: white;
@@ -45,7 +45,7 @@
             display: flex; align-items: center; justify-content: center;
             transition: left 0.3s ease;
         }
-        .search-panel:not(.hidden) + .toggle-btn { left: 315px; }
+        .search-panel:not(.hidden) + .toggle-btn { left: 325px; }
 
         h2 { margin: 0 0 20px 0; font-size: 1.25rem; color: #1e293b; font-weight: 600; display: flex; align-items: center; gap: 12px; }
         label { font-size: 0.7rem; font-weight: 700; color: #64748b; display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -53,12 +53,12 @@
         .search-input {
             width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0;
             margin-bottom: 15px; font-family: inherit; font-size: 0.9rem; box-sizing: border-box;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
         }
 
-        /* Grid de Filtros Rápidos */
         .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
         .btn-quick {
-            padding: 8px; font-size: 0.65rem; border-radius: 8px; border: 1px solid #e2e8f0;
+            padding: 10px 5px; font-size: 0.65rem; border-radius: 8px; border: 1px solid #e2e8f0;
             background: white; cursor: pointer; font-weight: 700; color: #475569;
             transition: all 0.2s; text-align: center;
         }
@@ -68,32 +68,35 @@
             width: 100%; background: var(--primary);
             color: white; border: none; padding: 14px; border-radius: 12px; 
             cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
         }
 
-        /* Popups y Cards */
-        .popup-container { width: 280px; max-height: 350px; overflow-y: auto; }
+        /* Estilos de los Popups */
+        .popup-container { width: 280px; max-height: 400px; overflow-y: auto; padding: 5px; }
         .header-vivienda { 
             padding: 10px; background: #f8fafc; border-radius: 12px; margin-bottom: 10px; border: 1px solid #e2e8f0;
         }
-        .header-vivienda b { color: #0f172a; display: block; font-size: 0.95rem; }
-        .header-vivienda small { color: #64748b; font-size: 0.75rem; display: block; margin-top: 2px; }
+        .header-vivienda b { color: #0f172a; display: block; font-size: 0.95rem; line-height: 1.2; }
+        .header-vivienda small { color: #64748b; font-size: 0.75rem; display: block; margin-top: 4px; }
 
         .child-card { 
             background: white; padding: 12px; border-radius: 12px; 
             margin-bottom: 10px; border: 1px solid #f1f5f9;
             position: relative; overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
-        .child-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--primary); }
+        .child-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #cbd5e1; }
         .child-card.anemia-alert::before { background: var(--danger); }
         .child-card.ina-alert { border: 2px solid var(--warning); }
 
         .status-badge { 
-            margin-top: 8px; padding: 5px 8px; border-radius: 6px;
-            font-size: 0.7rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;
+            margin-top: 8px; padding: 6px 8px; border-radius: 6px;
+            font-size: 0.7rem; font-weight: 600; display: flex; align-items: center; gap: 6px;
         }
-        .bg-red { background: #fef2f2; color: var(--danger); }
-        .bg-green { background: #f0fdf4; color: var(--success); }
-        .bg-orange { background: #fff7ed; color: var(--warning); border: 1px solid #ffedd5; width: 100%; box-sizing: border-box; }
+        .bg-red { background: #fef2f2; color: var(--danger); border: 1px solid #fee2e2; }
+        .bg-orange { background: #fff7ed; color: var(--warning); border: 1px solid #ffedd5; width: 100%; box-sizing: border-box; display: block !important; }
+        
+        .info-row { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: #64748b; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -101,10 +104,10 @@
 <div class="search-panel" id="sidePanel">
     <h2><i class="fas fa-satellite-dish" style="color:var(--primary)"></i> GeoBoy Pro</h2>
     
-    <label>Búsqueda por DNI Niño</label>
-    <input type="text" id="dniSearch" class="search-input" placeholder="Escriba DNI..." oninput="applyFilters()">
+    <label>Buscador (DNI / Nombres)</label>
+    <input type="text" id="mainSearch" class="search-input" placeholder="Buscar niño, madre o DNI..." oninput="applyFilters()">
 
-    <label>Filtros de Inasistencia</label>
+    <label>Filtrar por Inasistencia</label>
     <div class="filter-grid">
         <button class="btn-quick" id="btn-anemia" onclick="toggleFilter('anemia')">INAS. ANEMIA</button>
         <button class="btn-quick" id="btn-cred" onclick="toggleFilter('cred')">INAS. CRED</button>
@@ -112,16 +115,18 @@
         <button class="btn-quick" onclick="resetFilters()" style="background:#f1f5f9">LIMPIAR</button>
     </div>
 
-    <label>Rango de Nacimiento</label>
-    <input type="date" id="dateStart" class="search-input" style="margin-bottom:8px">
-    <input type="date" id="dateEnd" class="search-input">
+    <label>Fecha de Nacimiento</label>
+    <div style="display: flex; gap: 5px;">
+        <input type="date" id="dateStart" class="search-input" onchange="applyFilters()">
+        <input type="date" id="dateEnd" class="search-input" onchange="applyFilters()">
+    </div>
     
     <button class="btn-filter" onclick="fetchData()">
-        <i class="fas fa-sync-alt"></i> Sincronizar Datos
+        <i class="fas fa-sync-alt"></i> Actualizar desde Excel
     </button>
     
-    <div id="stats" style="margin-top:15px; font-size:0.75rem; text-align:center; color:#64748b;">
-        Cargando mapa...
+    <div id="stats" style="margin-top:15px; font-size:0.75rem; text-align:center; color:#64748b; font-weight: 600;">
+        Esperando conexión...
     </div>
 </div>
 
@@ -134,8 +139,8 @@
 <script>
     const URL_API = "https://script.google.com/macros/s/AKfycbzQtTigeMwwQVBmcjSrrY1R2P-eE8iLinNakwlysAGCFuR3ykA69CajF1_djw2VVDza/exec"; 
     
-    const satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { attribution: '© Google Maps' });
-    const map = L.map('map', { center: [-9.2938, -75.9926], zoom: 15, layers: [satellite], zoomControl: false });
+    const map = L.map('map', { center: [-9.2938, -75.9926], zoom: 15, zoomControl: false });
+    L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}').addTo(map);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     let markersLayer = L.layerGroup().addTo(map);
@@ -147,7 +152,7 @@
     }
 
     function parseDate(val) {
-        if (!val || val === "" || String(val).includes("#")) return null;
+        if (!val || String(val).includes("#") || String(val).trim() === "" || val === 0 || val === "0") return null;
         if (!isNaN(val) && typeof val === 'number') return new Date((val - 25569) * 86400 * 1000);
         let s = String(val).trim();
         let parts = s.split(/[\/\-]/);
@@ -158,12 +163,13 @@
             if (a < 100) a += 2000;
             return new Date(a, m, d, 12, 0, 0);
         }
-        return new Date(s);
+        let dObj = new Date(s);
+        return isNaN(dObj.getTime()) ? null : dObj;
     }
 
     function calcularEdad(fechaNacStr) {
         const f = parseDate(fechaNacStr);
-        if (!f || isNaN(f.getTime())) return "S/D";
+        if (!f) return "S/D";
         const hoy = new Date();
         let anios = hoy.getFullYear() - f.getFullYear();
         let meses = hoy.getMonth() - f.getMonth();
@@ -171,9 +177,8 @@
         if (dias < 0) { meses--; let ultDia = new Date(hoy.getFullYear(), hoy.getMonth(), 0).getDate(); dias += ultDia; }
         if (meses < 0) { anios--; meses += 12; }
         let texto = "";
-        if (anios > 0) texto += anios + (anios === 1 ? " año, " : " años, ");
-        texto += meses + (meses === 1 ? " mes y " : " meses y ");
-        texto += dias + (dias === 1 ? " día" : " días");
+        if (anios > 0) texto += anios + "a ";
+        texto += meses + "m " + dias + "d";
         return texto;
     }
 
@@ -197,33 +202,36 @@
     function resetFilters() {
         activeFilters = { anemia: false, cred: false, vacuna: false };
         document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
-        document.getElementById('dniSearch').value = '';
+        document.getElementById('mainSearch').value = '';
+        document.getElementById('dateStart').value = '';
+        document.getElementById('dateEnd').value = '';
         applyFilters();
     }
 
     function applyFilters() {
         markersLayer.clearLayers();
-        const dniTerm = document.getElementById('dniSearch').value.trim().toLowerCase();
-        const startStr = document.getElementById('dateStart').value;
-        const endStr = document.getElementById('dateEnd').value;
-        let dStart = startStr ? new Date(startStr + "T00:00:00") : null;
-        let dEnd = endStr ? new Date(endStr + "T23:59:59") : null;
+        const term = document.getElementById('mainSearch').value.toLowerCase().trim();
+        const dStart = document.getElementById('dateStart').value ? new Date(document.getElementById('dateStart').value + "T00:00:00") : null;
+        const dEnd = document.getElementById('dateEnd').value ? new Date(document.getElementById('dateEnd').value + "T23:59:59") : null;
 
         const grupos = {};
         let contadorNiños = 0;
 
         rawData.forEach(item => {
-            // Filtro por Fecha de Nacimiento
+            // Filtro de Fechas
             const fNac = parseDate(item.nacimientoHijo);
             if (dStart && fNac && fNac < dStart) return;
             if (dEnd && fNac && fNac > dEnd) return;
 
-            // Filtro por DNI
-            if (dniTerm && !String(item.dniHijo).includes(dniTerm)) return;
+            // Filtro de Búsqueda (DNI, Madre, Hijo)
+            const matchSearch = !term || 
+                String(item.dniHijo).includes(term) || 
+                item.nombreHijo.toLowerCase().includes(term) || 
+                item.nombreMadre.toLowerCase().includes(term);
+            if (!matchSearch) return;
 
             // Filtros de Inasistencia
             if (activeFilters.anemia && !item.citaFaltante) return;
-            // (Nota: CRED y VACUNA se activarán cuando el script envíe citaCred o citaVacuna)
             if (activeFilters.cred && !item.citaCred) return; 
             if (activeFilters.vacuna && !item.citaVacuna) return;
 
@@ -235,23 +243,26 @@
         for (const coord in grupos) {
             const personas = grupos[coord];
             const latlng = coord.split(",").map(Number);
-            const tieneAlerta = personas.some(p => (p.anemia && p.anemia !== "" && p.anemia !== "0") || p.citaFaltante);
+            
+            // Lógica de alerta para el color del marcador
+            const tieneAlerta = personas.some(p => {
+                const esAnemicoReal = p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0" && !String(p.anemia).includes("#");
+                return esAnemicoReal || p.citaFaltante;
+            });
 
             let html = `<div class="popup-container">
                 <div class="header-vivienda">
-                    <small>MADRE</small>
+                    <small>RESPONSABLE</small>
                     <b>${personas[0].nombreMadre}</b>
-                    <small><i class="fas fa-phone"></i> Cel: ${personas[0].celular || 'No registrado'}</small>
-                    <small><i class="fas fa-map-marker-alt"></i> ${personas[0].domicilio || 'Sin dirección'}</small>
+                    <div class="info-row"><i class="fas fa-phone"></i> Cel: ${personas[0].celular || 'S/N'}</div>
+                    <div class="info-row"><i class="fas fa-home"></i> ${personas[0].domicilio || 'Sin dirección'}</div>
                 </div>`;
 
             personas.forEach(p => {
-                const esAnemico = p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0";
-                const esInasistenteAnemia = p.citaFaltante !== null;
+                const esAnemico = p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0" && !String(p.anemia).includes("#");
+                const esInasistenteAnemia = p.citaFaltante !== null && p.citaFaltante !== undefined;
                 
-                let badge = `<div class="status-badge bg-green"><i class="fas fa-check-circle"></i> Protegido</div>`;
-                let inasistenciaHtml = "";
-                
+                let anemiaHtml = ""; 
                 if (esAnemico) {
                     const fDiag = parseDate(p.anemia);
                     let alta = "";
@@ -260,9 +271,10 @@
                         fAlta.setMonth(fAlta.getMonth() + 7);
                         alta = `<br><span style="font-size:0.65rem; font-weight:400">📅 Alta: ${fAlta.toLocaleDateString('es-PE')}</span>`;
                     }
-                    badge = `<div class="status-badge bg-red"><i class="fas fa-exclamation-triangle"></i> ANEMIA (${p.anemia})${alta}</div>`;
+                    anemiaHtml = `<div class="status-badge bg-red"><i class="fas fa-tint"></i> ANEMIA (${p.anemia})${alta}</div>`;
                 }
 
+                let inasistenciaHtml = "";
                 if (esInasistenteAnemia) {
                     inasistenciaHtml = `
                     <div class="status-badge bg-orange">
@@ -273,8 +285,8 @@
 
                 html += `<div class="child-card ${esAnemico ? 'anemia-alert' : ''} ${esInasistenteAnemia ? 'ina-alert' : ''}">
                     <span style="font-weight:600; color:#1e293b">👶 ${p.nombreHijo}</span><br>
-                    <span style="font-size:0.75rem; color:#64748b"><i class="fas fa-birthday-cake"></i> ${calcularEdad(p.nacimientoHijo)}</span>
-                    ${badge}
+                    <div class="info-row">DNI: ${p.dniHijo} | <i class="fas fa-birthday-cake"></i> ${calcularEdad(p.nacimientoHijo)}</div>
+                    ${anemiaHtml}
                     ${inasistenciaHtml}
                 </div>`;
             });
@@ -286,7 +298,7 @@
                 iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
             })}).bindPopup(html).addTo(markersLayer);
         }
-        document.getElementById('stats').innerText = `${contadorNiños} niños encontrados.`;
+        document.getElementById('stats').innerText = `${contadorNiños} niños en ${Object.keys(grupos).length} puntos.`;
     }
 
     fetchData();
