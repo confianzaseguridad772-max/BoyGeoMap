@@ -58,6 +58,7 @@
             transition: all 0.2s; text-align: center;
         }
         .btn-quick.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .btn-quick.active-anemia { background: var(--danger); color: white; border-color: var(--danger); }
 
         .btn-filter { 
             width: 100%; background: var(--primary); color: white; border: none; padding: 14px; 
@@ -88,6 +89,7 @@
         }
         .bg-red { background: #fef2f2; color: var(--danger); border: 1px solid #fee2e2; }
         .bg-orange { background: #fff7ed; color: var(--warning); border: 1px solid #ffedd5; width: 100%; box-sizing: border-box; display: block !important; }
+        .bg-anemia-total { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
         
         .info-row { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: #64748b; margin-top: 2px; }
     </style>
@@ -100,12 +102,13 @@
     <label>Buscador (DNI / Nombres)</label>
     <input type="text" id="mainSearch" class="search-input" placeholder="Buscar niño, madre o DNI..." oninput="applyFilters()">
 
-    <label>Filtrar por Inasistencia</label>
+    <label>Filtrar por Estado</label>
     <div class="filter-grid">
+        <button class="btn-quick" id="btn-soloAnemia" onclick="toggleFilter('soloAnemia')">NIÑOS ANÉMICOS</button>
         <button class="btn-quick" id="btn-anemia" onclick="toggleFilter('anemia')">INAS. ANEMIA</button>
         <button class="btn-quick" id="btn-cred" onclick="toggleFilter('cred')">INAS. CRED</button>
         <button class="btn-quick" id="btn-vacuna" onclick="toggleFilter('vacuna')">INAS. VACUNA</button>
-        <button class="btn-quick" onclick="resetFilters()" style="background:#f1f5f9">LIMPIAR</button>
+        <button class="btn-quick" onclick="resetFilters()" style="background:#f1f5f9; grid-column: span 2;">LIMPIAR TODO</button>
     </div>
 
     <label>Rango de Nacimiento</label>
@@ -136,7 +139,7 @@
 
     let markersLayer = L.layerGroup().addTo(map);
     let rawData = [];
-    let activeFilters = { anemia: false, cred: false, vacuna: false };
+    let activeFilters = { anemia: false, cred: false, vacuna: false, soloAnemia: false };
 
     function togglePanel() { document.getElementById('sidePanel').classList.toggle('hidden'); }
 
@@ -179,13 +182,18 @@
 
     function toggleFilter(type) {
         activeFilters[type] = !activeFilters[type];
-        document.getElementById('btn-' + type).classList.toggle('active');
+        const btn = document.getElementById('btn-' + type);
+        if (type === 'soloAnemia') btn.classList.toggle('active-anemia');
+        else btn.classList.toggle('active');
         applyFilters();
     }
 
     function resetFilters() {
-        activeFilters = { anemia: false, cred: false, vacuna: false };
-        document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
+        activeFilters = { anemia: false, cred: false, vacuna: false, soloAnemia: false };
+        document.querySelectorAll('.btn-quick').forEach(b => {
+            b.classList.remove('active');
+            b.classList.remove('active-anemia');
+        });
         document.getElementById('mainSearch').value = '';
         document.getElementById('dateStart').value = '';
         document.getElementById('dateEnd').value = '';
@@ -206,14 +214,17 @@
             if (dStart && fNac && fNac < dStart) return;
             if (dEnd && fNac && fNac > dEnd) return;
 
-            // Busca por nombre o por DNI (Columna H del Excel)
             const matchSearch = !term || 
                 String(item.dniHijo).includes(term) || 
                 item.nombreHijo.toLowerCase().includes(term) || 
                 item.nombreMadre.toLowerCase().includes(term);
             if (!matchSearch) return;
 
-            // FILTROS INDIVIDUALES POR TIPO DE INASISTENCIA (Extraídos de sus respectivas hojas)
+            // Lógica de anemia de Sheet1 (Columna O) O de la hoja Anemicos
+            const esAnemicoReal = (item.anemia && String(item.anemia).trim() !== "" && String(item.anemia).trim() !== "0" && !String(item.anemia).includes("#")) || item.fechaInicioAnemia;
+
+            // Aplicar Filtros de Botones
+            if (activeFilters.soloAnemia && !esAnemicoReal) return;
             if (activeFilters.anemia && !item.citaFaltante) return;
             if (activeFilters.cred && !item.citaCred) return; 
             if (activeFilters.vacuna && !item.citaVacuna) return;
@@ -227,10 +238,9 @@
             const personas = grupos[coord];
             const latlng = coord.split(",").map(Number);
             
-            // Prioridad para MARCADOR ROJO: Si tiene Anemia, Inasistencia CRED o Inasistencia Vacuna
             const tieneAlerta = personas.some(p => {
-                const esAnemicoReal = p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0" && !String(p.anemia).includes("#");
-                return esAnemicoReal || p.citaFaltante || p.citaCred || p.citaVacuna;
+                const esAnemico = (p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0" && !String(p.anemia).includes("#")) || p.fechaInicioAnemia;
+                return esAnemico || p.citaFaltante || p.citaCred || p.citaVacuna;
             });
 
             let html = `<div class="popup-container">
@@ -242,34 +252,30 @@
                 </div>`;
 
             personas.forEach(p => {
-                const esAnemico = p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0" && !String(p.anemia).includes("#");
+                const esAnemicoColO = p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0" && !String(p.anemia).includes("#");
+                const esAnemicoHoja = p.fechaInicioAnemia !== null;
+                const esAnemico = esAnemicoColO || esAnemicoHoja;
+
                 let badgesHtml = "";
                 
-                // 1. Badge Anemia (Base Sheet1 - Columna O)
+                // 1. Badge Anemia y Fecha de Alta (Calculado en Apps Script)
                 if (esAnemico) {
-                    const fDiag = parseDate(p.anemia);
-                    let alta = "";
-                    if (fDiag) {
-                        let fAlta = new Date(fDiag); fAlta.setMonth(fAlta.getMonth() + 7);
-                        alta = `<br><span style="font-size:0.65rem; font-weight:400">📅 Alta: ${fAlta.toLocaleDateString('es-PE')}</span>`;
+                    let detalleAlta = "";
+                    if (esAnemicoHoja) {
+                        detalleAlta = `<br><b>Alta (7m):</b> <span style="color:#166534">${p.fechaAltaAnemia}</span>`;
+                    } else if (esAnemicoColO) {
+                        const fDiag = parseDate(p.anemia);
+                        if (fDiag) {
+                            let fAlta = new Date(fDiag); fAlta.setMonth(fAlta.getMonth() + 7);
+                            detalleAlta = `<br><b>Alta (7m):</b> <span style="color:#166534">${fAlta.toLocaleDateString('es-PE')}</span>`;
+                        }
                     }
-                    badgesHtml += `<div class="status-badge bg-red"><i class="fas fa-tint"></i> ANEMIA (${p.anemia})${alta}</div>`;
+                    badgesHtml += `<div class="status-badge bg-red bg-anemia-total"><i class="fas fa-tint"></i> NIÑO ANÉMICO ${detalleAlta}</div>`;
                 }
 
-                // 2. Badge Inasistente Anemia (Hoja InaAnemia)
-                if (p.citaFaltante) {
-                    badgesHtml += `<div class="status-badge bg-orange"><i class="fas fa-calendar-times"></i> <b>INASISTENTE ANEMIA</b><br>Cita: ${p.citaFaltante}</div>`;
-                }
-
-                // 3. Badge Inasistente CRED (Hoja InaCRED)
-                if (p.citaCred) {
-                    badgesHtml += `<div class="status-badge bg-orange" style="border-color:#3b82f6"><i class="fas fa-baby"></i> <b>INASISTENTE CRED</b><br>Cita: ${p.citaCred}</div>`;
-                }
-
-                // 4. Badge Inasistente VACUNA (Hoja InaVacunas)
-                if (p.citaVacuna) {
-                    badgesHtml += `<div class="status-badge bg-orange" style="border-color:#22c55e"><i class="fas fa-syringe"></i> <b>INASISTENTE VACUNA</b><br>Cita: ${p.citaVacuna}</div>`;
-                }
+                if (p.citaFaltante) badgesHtml += `<div class="status-badge bg-orange"><i class="fas fa-calendar-times"></i> INASISTENTE ANEMIA<br>Cita: ${p.citaFaltante}</div>`;
+                if (p.citaCred) badgesHtml += `<div class="status-badge bg-orange" style="border-color:#3b82f6"><i class="fas fa-baby"></i> INASISTENTE CRED<br>Cita: ${p.citaCred}</div>`;
+                if (p.citaVacuna) badgesHtml += `<div class="status-badge bg-orange" style="border-color:#22c55e"><i class="fas fa-syringe"></i> INASISTENTE VACUNA<br>Cita: ${p.citaVacuna}</div>`;
 
                 html += `<div class="child-card ${esAnemico ? 'anemia-alert' : ''} ${(p.citaFaltante || p.citaCred || p.citaVacuna) ? 'ina-alert' : ''}">
                     <span style="font-weight:600; color:#1e293b">👶 ${p.nombreHijo}</span><br>
