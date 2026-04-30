@@ -66,6 +66,14 @@
             display: flex; align-items: center; justify-content: center; gap: 8px;
         }
 
+        /* DISEÑO DE ESTADÍSTICAS */
+        .stats-box {
+            margin-top: 20px; padding: 15px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;
+        }
+        .stat-line { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 5px; color: #475569; }
+        .stat-line b { color: #1e293b; }
+        .stat-danger { color: var(--danger) !important; font-weight: 700; }
+
         .popup-container { width: 280px; max-height: 400px; overflow-y: auto; padding: 5px; }
         .header-vivienda { 
             padding: 10px; background: #f8fafc; border-radius: 12px; margin-bottom: 10px; border: 1px solid #e2e8f0;
@@ -120,8 +128,20 @@
     <button class="btn-filter" onclick="fetchData()">
         <i class="fas fa-sync-alt"></i> Sincronizar Excel
     </button>
+
+    <!-- NUEVO PANEL DE ESTADÍSTICAS SOLICITADO -->
+    <div class="stats-box">
+        <label style="margin-bottom: 10px;">Resumen Estadístico</label>
+        <div class="stat-line"><span>N° Madres:</span> <b id="stat-madres">0</b></div>
+        <div class="stat-line"><span>N° Niños:</span> <b id="stat-ninos">0</b></div>
+        <div class="stat-line"><span>N° Anémicos:</span> <b id="stat-anemicos" class="stat-danger">0</b></div>
+        <hr style="border:0; border-top:1px solid #e2e8f0; margin: 8px 0;">
+        <div class="stat-line"><span>Inas. Anemia:</span> <b id="stat-ina-anemia">0</b></div>
+        <div class="stat-line"><span>Inas. CRED:</span> <b id="stat-ina-cred">0</b></div>
+        <div class="stat-line"><span>Inas. Vacuna:</span> <b id="stat-ina-vacuna">0</b></div>
+    </div>
     
-    <div id="stats" style="margin-top:15px; font-size:0.75rem; text-align:center; color:#64748b; font-weight: 600;">
+    <div id="stats" style="margin-top:15px; font-size:0.7rem; text-align:center; color:#94a3b8;">
         Esperando conexión...
     </div>
 </div>
@@ -131,7 +151,7 @@
 <div id="map"></div>
 
 <script>
-    const URL_API = "https://script.google.com/macros/s/AKfycbw6rgAW7anZFnr-zi6niMCr5ApoJtykC-R63RS6A_Uu7VFrnAZWLSC1fTVe9618klH6/exec"; 
+    const URL_API = "https://script.google.com/macros/s/AKfycbzWdY-VvbVnu64mD2RJyjkZnQOK2fvZKAdR120gPHZhBMOm_bwI8V7vCvVb34qJYiNm/exec"; 
     
     const map = L.map('map', { center: [-9.2938, -75.9926], zoom: 15, zoomControl: false });
     L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}').addTo(map);
@@ -207,7 +227,14 @@
         const dEnd = document.getElementById('dateEnd').value ? new Date(document.getElementById('dateEnd').value + "T23:59:59") : null;
 
         const grupos = {};
-        let contadorNiños = 0;
+        
+        // Variables para contadores estadísticos
+        let contNinos = 0;
+        let contAnemicos = 0;
+        let contInaAnemia = 0;
+        let contInaCred = 0;
+        let contInaVacuna = 0;
+        const setMadres = new Set();
 
         rawData.forEach(item => {
             const fNac = parseDate(item.nacimientoHijo);
@@ -220,20 +247,35 @@
                 item.nombreMadre.toLowerCase().includes(term);
             if (!matchSearch) return;
 
-            // Lógica de anemia de Sheet1 (Columna O) O de la hoja Anemicos
             const esAnemicoReal = (item.anemia && String(item.anemia).trim() !== "" && String(item.anemia).trim() !== "0" && !String(item.anemia).includes("#")) || item.fechaInicioAnemia;
 
-            // Aplicar Filtros de Botones
+            // Filtros de Botones
             if (activeFilters.soloAnemia && !esAnemicoReal) return;
             if (activeFilters.anemia && !item.citaFaltante) return;
             if (activeFilters.cred && !item.citaCred) return; 
             if (activeFilters.vacuna && !item.citaVacuna) return;
 
+            // Actualizar Contadores si pasa los filtros
+            contNinos++;
+            setMadres.add(item.nombreMadre);
+            if (esAnemicoReal) contAnemicos++;
+            if (item.citaFaltante) contInaAnemia++;
+            if (item.citaCred) contInaCred++;
+            if (item.citaVacuna) contInaVacuna++;
+
             if (!grupos[item.coords]) grupos[item.coords] = [];
             grupos[item.coords].push(item);
-            contadorNiños++;
         });
 
+        // Actualizar el Panel de Estadísticas en el HTML
+        document.getElementById('stat-madres').innerText = setMadres.size;
+        document.getElementById('stat-ninos').innerText = contNinos;
+        document.getElementById('stat-anemicos').innerText = contAnemicos;
+        document.getElementById('stat-ina-anemia').innerText = contInaAnemia;
+        document.getElementById('stat-ina-cred').innerText = contInaCred;
+        document.getElementById('stat-ina-vacuna').innerText = contInaVacuna;
+
+        // Dibujar Marcadores
         for (const coord in grupos) {
             const personas = grupos[coord];
             const latlng = coord.split(",").map(Number);
@@ -257,8 +299,6 @@
                 const esAnemico = esAnemicoColO || esAnemicoHoja;
 
                 let badgesHtml = "";
-                
-                // 1. Badge Anemia y Fecha de Alta (Calculado en Apps Script)
                 if (esAnemico) {
                     let detalleAlta = "";
                     if (esAnemicoHoja) {
@@ -289,7 +329,7 @@
                 iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
             })}).bindPopup(html + "</div>").addTo(markersLayer);
         }
-        document.getElementById('stats').innerText = `${contadorNiños} niños encontrados.`;
+        document.getElementById('stats').innerText = `${contNinos} niños visualizados.`;
     }
     fetchData();
 </script>
