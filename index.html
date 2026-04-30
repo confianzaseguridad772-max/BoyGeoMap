@@ -100,15 +100,15 @@
         
         .info-row { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: #64748b; margin-top: 2px; }
 
-        /* Estilo para botones de contacto */
+        /* Estilo para botones de contacto con texto negro */
         .contact-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
         .btn-contact { 
-            text-decoration: none; color: white; padding: 8px; border-radius: 8px; 
-            text-align: center; font-size: 0.75rem; font-weight: 600; display: flex; 
+            text-decoration: none; color: #000000; padding: 8px; border-radius: 8px; 
+            text-align: center; font-size: 0.75rem; font-weight: 700; display: flex; 
             align-items: center; justify-content: center; gap: 5px;
         }
         .btn-whatsapp { background: var(--success); }
-        .btn-phone { background: var(--primary); }
+        .btn-phone { background: #3b82f6; }
     </style>
 </head>
 <body>
@@ -287,7 +287,6 @@
                 return esAnemico || p.citaFaltante || p.citaCred || p.citaVacuna;
             });
 
-            // Generar links de contacto
             const tel = String(personas[0].celular || "").replace(/\D/g, "");
             const waLink = `https://wa.me/51${tel}?text=Hola%20${encodeURIComponent(personas[0].nombreMadre)},%20le%20escribimos%20del%20Puesto%20de%20Salud%20Castillo%20Grande...`;
 
