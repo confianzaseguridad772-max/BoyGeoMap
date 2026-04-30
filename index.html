@@ -66,7 +66,6 @@
             display: flex; align-items: center; justify-content: center; gap: 8px;
         }
 
-        /* DISEÑO DE ESTADÍSTICAS */
         .stats-box {
             margin-top: 20px; padding: 15px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;
         }
@@ -100,6 +99,16 @@
         .bg-anemia-total { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
         
         .info-row { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+
+        /* Estilo para botones de contacto */
+        .contact-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .btn-contact { 
+            text-decoration: none; color: white; padding: 8px; border-radius: 8px; 
+            text-align: center; font-size: 0.75rem; font-weight: 600; display: flex; 
+            align-items: center; justify-content: center; gap: 5px;
+        }
+        .btn-whatsapp { background: var(--success); }
+        .btn-phone { background: var(--primary); }
     </style>
 </head>
 <body>
@@ -129,7 +138,6 @@
         <i class="fas fa-sync-alt"></i> Sincronizar Excel
     </button>
 
-    <!-- NUEVO PANEL DE ESTADÍSTICAS SOLICITADO -->
     <div class="stats-box">
         <label style="margin-bottom: 10px;">Resumen Estadístico</label>
         <div class="stat-line"><span>N° Madres:</span> <b id="stat-madres">0</b></div>
@@ -151,7 +159,7 @@
 <div id="map"></div>
 
 <script>
-    const URL_API = "https://script.google.com/macros/s/AKfycbzWdY-VvbVnu64mD2RJyjkZnQOK2fvZKAdR120gPHZhBMOm_bwI8V7vCvVb34qJYiNm/exec"; 
+    const URL_API = "https://script.google.com/macros/s/AKfycbzNPmSm-pST9T9oNWfTRk3EBf2GXj3VVnAyANSuNaWwf7MKzHjV5Vf1qR3T0fmvTN3r/exec"; 
     
     const map = L.map('map', { center: [-9.2938, -75.9926], zoom: 15, zoomControl: false });
     L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}').addTo(map);
@@ -227,8 +235,6 @@
         const dEnd = document.getElementById('dateEnd').value ? new Date(document.getElementById('dateEnd').value + "T23:59:59") : null;
 
         const grupos = {};
-        
-        // Variables para contadores estadísticos
         let contNinos = 0;
         let contAnemicos = 0;
         let contInaAnemia = 0;
@@ -249,13 +255,11 @@
 
             const esAnemicoReal = (item.anemia && String(item.anemia).trim() !== "" && String(item.anemia).trim() !== "0" && !String(item.anemia).includes("#")) || item.fechaInicioAnemia;
 
-            // Filtros de Botones
             if (activeFilters.soloAnemia && !esAnemicoReal) return;
             if (activeFilters.anemia && !item.citaFaltante) return;
             if (activeFilters.cred && !item.citaCred) return; 
             if (activeFilters.vacuna && !item.citaVacuna) return;
 
-            // Actualizar Contadores si pasa los filtros
             contNinos++;
             setMadres.add(item.nombreMadre);
             if (esAnemicoReal) contAnemicos++;
@@ -267,7 +271,6 @@
             grupos[item.coords].push(item);
         });
 
-        // Actualizar el Panel de Estadísticas en el HTML
         document.getElementById('stat-madres').innerText = setMadres.size;
         document.getElementById('stat-ninos').innerText = contNinos;
         document.getElementById('stat-anemicos').innerText = contAnemicos;
@@ -275,7 +278,6 @@
         document.getElementById('stat-ina-cred').innerText = contInaCred;
         document.getElementById('stat-ina-vacuna').innerText = contInaVacuna;
 
-        // Dibujar Marcadores
         for (const coord in grupos) {
             const personas = grupos[coord];
             const latlng = coord.split(",").map(Number);
@@ -285,32 +287,51 @@
                 return esAnemico || p.citaFaltante || p.citaCred || p.citaVacuna;
             });
 
+            // Generar links de contacto
+            const tel = String(personas[0].celular || "").replace(/\D/g, "");
+            const waLink = `https://wa.me/51${tel}?text=Hola%20${encodeURIComponent(personas[0].nombreMadre)},%20le%20escribimos%20del%20Puesto%20de%20Salud%20Castillo%20Grande...`;
+
             let html = `<div class="popup-container">
                 <div class="header-vivienda">
                     <small>RESPONSABLE</small>
                     <b>${personas[0].nombreMadre}</b>
                     <div class="info-row"><i class="fas fa-phone"></i> Cel: ${personas[0].celular || 'S/N'}</div>
                     <div class="info-row"><i class="fas fa-home"></i> ${personas[0].domicilio || 'S/D'}</div>
+                    
+                    <div class="contact-actions">
+                        <a href="${waLink}" target="_blank" class="btn-contact btn-whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+                        <a href="tel:${tel}" class="btn-contact btn-phone"><i class="fas fa-phone-alt"></i> Llamar</a>
+                    </div>
                 </div>`;
 
             personas.forEach(p => {
                 const esAnemicoColO = p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0" && !String(p.anemia).includes("#");
-                const esAnemicoHoja = p.fechaInicioAnemia !== null;
+                const esAnemicoHoja = p.fechaInicioAnemia !== null && p.fechaInicioAnemia !== undefined;
                 const esAnemico = esAnemicoColO || esAnemicoHoja;
 
                 let badgesHtml = "";
                 if (esAnemico) {
-                    let detalleAlta = "";
+                    let fInicioStr = "S/D";
+                    let fAltaStr = "S/D";
+
                     if (esAnemicoHoja) {
-                        detalleAlta = `<br><b>Alta (7m):</b> <span style="color:#166534">${p.fechaAltaAnemia}</span>`;
+                        fInicioStr = p.fechaInicioAnemia;
+                        fAltaStr = p.fechaAltaAnemia || "S/D";
                     } else if (esAnemicoColO) {
                         const fDiag = parseDate(p.anemia);
                         if (fDiag) {
-                            let fAlta = new Date(fDiag); fAlta.setMonth(fAlta.getMonth() + 7);
-                            detalleAlta = `<br><b>Alta (7m):</b> <span style="color:#166534">${fAlta.toLocaleDateString('es-PE')}</span>`;
+                            fInicioStr = fDiag.toLocaleDateString('es-PE');
+                            let fAlta = new Date(fDiag); 
+                            fAlta.setMonth(fAlta.getMonth() + 7);
+                            fAltaStr = fAlta.toLocaleDateString('es-PE');
                         }
                     }
-                    badgesHtml += `<div class="status-badge bg-red bg-anemia-total"><i class="fas fa-tint"></i> NIÑO ANÉMICO ${detalleAlta}</div>`;
+                    badgesHtml += `<div class="status-badge bg-red bg-anemia-total">
+                        <i class="fas fa-tint"></i> NIÑO ANÉMICO 
+                        <div style="font-size:0.65rem; margin-top:2px; font-weight:400; color:#1e293b;">
+                            <b>Inicio:</b> ${fInicioStr} | <b style="color:#166534">Alta:</b> ${fAltaStr}
+                        </div>
+                    </div>`;
                 }
 
                 if (p.citaFaltante) badgesHtml += `<div class="status-badge bg-orange"><i class="fas fa-calendar-times"></i> INASISTENTE ANEMIA<br>Cita: ${p.citaFaltante}</div>`;
