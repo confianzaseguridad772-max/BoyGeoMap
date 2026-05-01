@@ -115,7 +115,13 @@
         .btn-phone { background: #3b82f6; }
         .btn-route { background: #1e293b; color: white !important; grid-column: span 2; margin-top: 5px; }
 
-        /* Ocultar panel de instrucciones de ruta para no tapar el mapa */
+        /* Estilo para botón de registro */
+        .btn-register {
+            width: 100%; margin-top: 8px; background: #059669; color: white !important;
+            border: none; padding: 6px; border-radius: 6px; font-size: 0.65rem;
+            cursor: pointer; font-weight: 600;
+        }
+
         .leaflet-routing-container { display: none; }
     </style>
 </head>
@@ -177,15 +183,19 @@
     let rawData = [];
     let activeFilters = { anemia: false, cred: false, vacuna: false, soloAnemia: false };
     let routingControl = null;
+    let watchId = null;
 
-    // --- NUEVAS FUNCIONES DE NAVEGACIÓN ---
-    function iniciarNavegacion(latDestino, lngDestino, nombreNino) {
+    // --- NUEVAS FUNCIONES DE NAVEGACIÓN MEJORADA ---
+    function iniciarNavegacion(latDestino, lngDestino, nombreMadre) {
         if (!navigator.geolocation) {
             alert("Tu navegador no soporta geolocalización");
             return;
         }
 
-        navigator.geolocation.getCurrentPosition((pos) => {
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        hablar(`Iniciando ruta hacia la casa de la señora ${nombreMadre}.`);
+
+        watchId = navigator.geolocation.watchPosition((pos) => {
             const latOrigen = pos.coords.latitude;
             const lngOrigen = pos.coords.longitude;
 
@@ -195,29 +205,65 @@
                 waypoints: [L.latLng(latOrigen, lngOrigen), L.latLng(latDestino, lngDestino)],
                 language: 'es',
                 router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-                lineOptions: { styles: [{ color: '#2563eb', weight: 6 }] },
+                lineOptions: { styles: [{ color: '#2563eb', weight: 8, opacity: 0.8 }] },
+                fitSelectedRoutes: true,
                 createMarker: function() { return null; }
             }).addTo(map);
 
-            hablar(`Iniciando ruta hacia la vivienda de ${nombreNino}.`);
-
             routingControl.on('routesfound', function(e) {
-                const instructions = e.routes[0].instructions;
-                if (instructions.length > 0) {
-                    hablar("En " + Math.round(instructions[0].distance) + " metros, " + instructions[0].text);
+                const route = e.routes[0];
+                const dist = route.summary.totalDistance;
+                const instructions = route.instructions[0];
+
+                if (dist < 15) {
+                    hablar(`Has llegado a la casa de la señora ${nombreMadre}.`);
+                    navigator.geolocation.clearWatch(watchId);
+                } else if (instructions && instructions.distance < 20) {
+                    hablar(`En 20 metros, ${instructions.text}`);
                 }
             });
 
-        }, () => alert("Por favor, activa el GPS para navegar."));
+        }, () => alert("GPS desactivado."), { enableHighAccuracy: true });
+    }
+
+    // REGISTRO DE VISITA AUTOMÁTICO
+    async function registrarVisita(nombreMadre, nombreHijo) {
+        const btn = event.target;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registrando...';
+        
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const coords = `${pos.coords.latitude},${pos.coords.longitude}`;
+            const data = {
+                action: "registrarVisita", // Asegúrate de manejar esta acción en tu .gs
+                madre: nombreMadre,
+                hijo: nombreHijo,
+                ubicacion: coords,
+                fecha: new Date().toLocaleString()
+            };
+
+            try {
+                // Enviamos los datos al mismo script de Google Sheets
+                await fetch(URL_API, {
+                    method: 'POST',
+                    mode: 'no-cors', // Necesario para Google Apps Script
+                    body: JSON.stringify(data)
+                });
+                btn.style.background = "#22c55e";
+                btn.innerText = "¡VISITA REGISTRADA!";
+                hablar(`Visita de ${nombreHijo} registrada correctamente.`);
+            } catch (e) {
+                btn.innerText = "ERROR AL REGISTRAR";
+            }
+        });
     }
 
     function hablar(texto) {
+        window.speechSynthesis.cancel(); // Detiene voces anteriores
         const utterance = new SpeechSynthesisUtterance(texto);
-        utterance.lang = 'es-ES';
+        utterance.lang = 'es-PE';
         utterance.rate = 0.9;
         window.speechSynthesis.speak(utterance);
     }
-    // ---------------------------------------
 
     function togglePanel() { document.getElementById('sidePanel').classList.toggle('hidden'); }
 
@@ -276,6 +322,7 @@
         document.getElementById('dateStart').value = '';
         document.getElementById('dateEnd').value = '';
         if (routingControl) map.removeControl(routingControl);
+        if (watchId) navigator.geolocation.clearWatch(watchId);
         applyFilters();
     }
 
@@ -286,11 +333,7 @@
         const dEnd = document.getElementById('dateEnd').value ? new Date(document.getElementById('dateEnd').value + "T23:59:59") : null;
 
         const grupos = {};
-        let contNinos = 0;
-        let contAnemicos = 0;
-        let contInaAnemia = 0;
-        let contInaCred = 0;
-        let contInaVacuna = 0;
+        let contNinos = 0; let contAnemicos = 0; let contInaAnemia = 0; let contInaCred = 0; let contInaVacuna = 0;
         const setMadres = new Set();
 
         rawData.forEach(item => {
@@ -298,10 +341,7 @@
             if (dStart && fNac && fNac < dStart) return;
             if (dEnd && fNac && fNac > dEnd) return;
 
-            const matchSearch = !term || 
-                String(item.dniHijo).includes(term) || 
-                item.nombreHijo.toLowerCase().includes(term) || 
-                item.nombreMadre.toLowerCase().includes(term);
+            const matchSearch = !term || String(item.dniHijo).includes(term) || item.nombreHijo.toLowerCase().includes(term) || item.nombreMadre.toLowerCase().includes(term);
             if (!matchSearch) return;
 
             const esAnemicoReal = (item.anemia && String(item.anemia).trim() !== "" && String(item.anemia).trim() !== "0" && !String(item.anemia).includes("#")) || item.fechaInicioAnemia;
@@ -332,14 +372,13 @@
         for (const coord in grupos) {
             const personas = grupos[coord];
             const latlng = coord.split(",").map(Number);
-            
             const tieneAlerta = personas.some(p => {
                 const esAnemico = (p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0" && !String(p.anemia).includes("#")) || p.fechaInicioAnemia;
                 return esAnemico || p.citaFaltante || p.citaCred || p.citaVacuna;
             });
 
             const tel = String(personas[0].celular || "").replace(/\D/g, "");
-            const waLink = `https://wa.me/51${tel}?text=Hola%20${encodeURIComponent(personas[0].nombreMadre)},%20le%20escribimos%20del%20Puesto%20de%20Salud%20Castillo%20Grande...`;
+            const waLink = `https://wa.me/51${tel}?text=Hola%20${encodeURIComponent(personas[0].nombreMadre)},%20le%20escribimos%20del%20Centro%20Salud%20Castillo%20Grande...`;
 
             let html = `<div class="popup-container">
                 <div class="header-vivienda">
@@ -347,54 +386,31 @@
                     <b>${personas[0].nombreMadre}</b>
                     <div class="info-row"><i class="fas fa-phone"></i> Cel: ${personas[0].celular || 'S/N'}</div>
                     <div class="info-row"><i class="fas fa-home"></i> ${personas[0].domicilio || 'S/D'}</div>
-                    
                     <div class="contact-actions">
                         <a href="${waLink}" target="_blank" class="btn-contact btn-whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</a>
                         <a href="tel:${tel}" class="btn-contact btn-phone"><i class="fas fa-phone-alt"></i> Llamar</a>
-                        <button onclick="iniciarNavegacion(${latlng[0]}, ${latlng[1]}, '${personas[0].nombreHijo}')" class="btn-contact btn-route">
+                        <button onclick="iniciarNavegacion(${latlng[0]}, ${latlng[1]}, '${personas[0].nombreMadre.replace(/'/g, "")}')" class="btn-contact btn-route">
                             <i class="fas fa-route"></i> ¿CÓMO LLEGAR?
                         </button>
                     </div>
                 </div>`;
 
             personas.forEach(p => {
-                const esAnemicoColO = p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0" && !String(p.anemia).includes("#");
-                const esAnemicoHoja = p.fechaInicioAnemia !== null && p.fechaInicioAnemia !== undefined;
-                const esAnemico = esAnemicoColO || esAnemicoHoja;
-
+                const esAnemico = (p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0" && !String(p.anemia).includes("#")) || p.fechaInicioAnemia;
                 let badgesHtml = "";
                 if (esAnemico) {
-                    let fInicioStr = "S/D";
-                    let fAltaStr = "S/D";
-
-                    if (esAnemicoHoja) {
-                        fInicioStr = p.fechaInicioAnemia;
-                        fAltaStr = p.fechaAltaAnemia || "S/D";
-                    } else if (esAnemicoColO) {
-                        const fDiag = parseDate(p.anemia);
-                        if (fDiag) {
-                            fInicioStr = fDiag.toLocaleDateString('es-PE');
-                            let fAlta = new Date(fDiag); 
-                            fAlta.setMonth(fAlta.getMonth() + 7);
-                            fAltaStr = fAlta.toLocaleDateString('es-PE');
-                        }
-                    }
-                    badgesHtml += `<div class="status-badge bg-red bg-anemia-total">
-                        <i class="fas fa-tint"></i> NIÑO ANÉMICO 
-                        <div style="font-size:0.65rem; margin-top:2px; font-weight:400; color:#1e293b;">
-                            <b>Inicio:</b> ${fInicioStr} | <b style="color:#166534">Alta:</b> ${fAltaStr}
-                        </div>
-                    </div>`;
+                    badgesHtml += `<div class="status-badge bg-red bg-anemia-total"><i class="fas fa-tint"></i> NIÑO ANÉMICO</div>`;
                 }
-
-                if (p.citaFaltante) badgesHtml += `<div class="status-badge bg-orange"><i class="fas fa-calendar-times"></i> INASISTENTE ANEMIA<br>Cita: ${p.citaFaltante}</div>`;
-                if (p.citaCred) badgesHtml += `<div class="status-badge bg-orange" style="border-color:#3b82f6"><i class="fas fa-baby"></i> INASISTENTE CRED<br>Cita: ${p.citaCred}</div>`;
-                if (p.citaVacuna) badgesHtml += `<div class="status-badge bg-orange" style="border-color:#22c55e"><i class="fas fa-syringe"></i> INASISTENTE VACUNA<br>Cita: ${p.citaVacuna}</div>`;
-
-                html += `<div class="child-card ${esAnemico ? 'anemia-alert' : ''} ${(p.citaFaltante || p.citaCred || p.citaVacuna) ? 'ina-alert' : ''}">
-                    <span style="font-weight:600; color:#1e293b">👶 ${p.nombreHijo}</span><br>
-                    <div class="info-row">DNI: ${p.dniHijo} | ${calcularEdad(p.nacimientoHijo)}</div>
+                if (p.citaFaltante) badgesHtml += `<div class="status-badge bg-orange"><i class="fas fa-calendar-times"></i> INAS. ANEMIA: ${p.citaFaltante}</div>`;
+                if (p.citaCred) badgesHtml += `<div class="status-badge bg-orange" style="border-color:#3b82f6"><i class="fas fa-baby"></i> INAS. CRED: ${p.citaCred}</div>`;
+                
+                html += `<div class="child-card ${esAnemico ? 'anemia-alert' : ''}">
+                    <span style="font-weight:600;">👶 ${p.nombreHijo}</span>
+                    <div class="info-row">${calcularEdad(p.nacimientoHijo)}</div>
                     ${badgesHtml}
+                    <button class="btn-register" onclick="registrarVisita('${p.nombreMadre}', '${p.nombreHijo}')">
+                        <i class="fas fa-check-circle"></i> REGISTRAR VISITA
+                    </button>
                 </div>`;
             });
 
@@ -403,7 +419,6 @@
                 iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
             })}).bindPopup(html + "</div>").addTo(markersLayer);
         }
-        document.getElementById('stats').innerText = `${contNinos} niños visualizados.`;
     }
     fetchData();
 </script>
