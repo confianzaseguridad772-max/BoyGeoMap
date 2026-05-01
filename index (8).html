@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoBoy Castillo Grande - Monitor Pro</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Librerías para Trayectorias -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary: #2563eb;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --warning: #f97316;
+            --glass: rgba(255, 255, 255, 0.95);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Inter', sans-serif; background: #f0f2f5; overflow: hidden; }
+        #map { height: 100vh; width: 100%; z-index: 1; }
+
+        .search-panel {
+            position: absolute; top: 0; left: 0; bottom: 0; z-index: 1010;
+            background: var(--glass); backdrop-filter: blur(15px);
+            padding: 24px; width: 310px;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow); overflow-y: auto;
+            border-right: 1px solid rgba(0,0,0,0.1);
+        }
+        .search-panel.hidden { transform: translateX(-100%); }
+
+        .toggle-btn {
+            position: absolute; top: 15px; left: 15px; z-index: 1020;
+            background: var(--primary); color: white;
+            border: none; width: 45px; height: 45px; border-radius: 12px;
+            cursor: pointer; box-shadow: var(--shadow);
+            display: flex; align-items: center; justify-content: center;
+            transition: left 0.3s ease;
+        }
+        .search-panel:not(.hidden) + .toggle-btn { left: 325px; }
+
+        h2 { margin: 0 0 20px 0; font-size: 1.25rem; color: #1e293b; font-weight: 600; display: flex; align-items: center; gap: 12px; }
+        label { font-size: 0.7rem; font-weight: 700; color: #64748b; display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .search-input {
+            width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0;
+            margin-bottom: 15px; font-family: inherit; font-size: 0.9rem; box-sizing: border-box;
+        }
+
+        .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+        .btn-quick {
+            padding: 10px 5px; font-size: 0.65rem; border-radius: 8px; border: 1px solid #e2e8f0;
+            background: white; cursor: pointer; font-weight: 700; color: #475569;
+            transition: all 0.2s; text-align: center;
+        }
+        .btn-quick.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .btn-quick.active-anemia { background: var(--danger); color: white; border-color: var(--danger); }
+
+        .btn-filter { 
+            width: 100%; background: var(--primary); color: white; border: none; padding: 14px; 
+            border-radius: 12px; cursor: pointer; font-weight: 600; 
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+
+        .stats-box {
+            margin-top: 20px; padding: 15px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;
+        }
+        .stat-line { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 5px; color: #475569; }
+        .stat-line b { color: #1e293b; }
+        .stat-danger { color: var(--danger) !important; font-weight: 700; }
+
+        .popup-container { width: 280px; max-height: 400px; overflow-y: auto; padding: 5px; }
+        .header-vivienda { 
+            padding: 10px; background: #f8fafc; border-radius: 12px; margin-bottom: 10px; border: 1px solid #e2e8f0;
+        }
+        .header-vivienda b { color: #0f172a; display: block; font-size: 0.95rem; line-height: 1.2; }
+        .header-vivienda small { color: #64748b; font-size: 0.75rem; display: block; margin-top: 4px; }
+
+        .child-card { 
+            background: white; padding: 12px; border-radius: 12px; 
+            margin-bottom: 10px; border: 1px solid #f1f5f9;
+            position: relative; overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .child-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #cbd5e1; }
+        .child-card.anemia-alert::before { background: var(--danger); }
+        .child-card.ina-alert { border: 2px solid var(--warning); }
+
+        .status-badge { 
+            margin-top: 8px; padding: 6px 8px; border-radius: 6px;
+            font-size: 0.7rem; font-weight: 600; display: flex; align-items: center; gap: 6px;
+        }
+        .bg-red { background: #fef2f2; color: var(--danger); border: 1px solid #fee2e2; }
+        .bg-orange { background: #fff7ed; color: var(--warning); border: 1px solid #ffedd5; width: 100%; box-sizing: border-box; display: block !important; }
+        .bg-anemia-total { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
+        
+        .info-row { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+
+        .contact-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .btn-contact { 
+            text-decoration: none; color: #000000 !important; padding: 8px; border-radius: 8px; 
+            text-align: center; font-size: 0.75rem; font-weight: 700; display: flex; 
+            align-items: center; justify-content: center; gap: 5px; cursor: pointer; border: none;
+        }
+        .btn-whatsapp { background: var(--success); }
+        .btn-phone { background: #3b82f6; }
+        .btn-route { background: #1e293b; color: white !important; grid-column: span 2; margin-top: 5px; }
+
+        /* Estilo para botón de registro */
+        .btn-register {
+            width: 100%; margin-top: 8px; background: #059669; color: white !important;
+            border: none; padding: 6px; border-radius: 6px; font-size: 0.65rem;
+            cursor: pointer; font-weight: 600;
+        }
+
+        .leaflet-routing-container { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="search-panel" id="sidePanel">
+    <h2><i class="fas fa-satellite-dish" style="color:var(--primary)"></i> GeoBoy Pro</h2>
+    
+    <label>Buscador (DNI / Nombres)</label>
+    <input type="text" id="mainSearch" class="search-input" placeholder="Buscar niño, madre o DNI..." oninput="applyFilters()">
+
+    <label>Filtrar por Estado</label>
+    <div class="filter-grid">
+        <button class="btn-quick" id="btn-soloAnemia" onclick="toggleFilter('soloAnemia')">NIÑOS ANÉMICOS</button>
+        <button class="btn-quick" id="btn-anemia" onclick="toggleFilter('anemia')">INAS. ANEMIA</button>
+        <button class="btn-quick" id="btn-cred" onclick="toggleFilter('cred')">INAS. CRED</button>
+        <button class="btn-quick" id="btn-vacuna" onclick="toggleFilter('vacuna')">INAS. VACUNA</button>
+        <button class="btn-quick" onclick="resetFilters()" style="background:#f1f5f9; grid-column: span 2;">LIMPIAR TODO</button>
+    </div>
+
+    <label>Rango de Nacimiento</label>
+    <div style="display: flex; gap: 5px;">
+        <input type="date" id="dateStart" class="search-input" onchange="applyFilters()">
+        <input type="date" id="dateEnd" class="search-input" onchange="applyFilters()">
+    </div>
+    
+    <button class="btn-filter" onclick="fetchData()">
+        <i class="fas fa-sync-alt"></i> CONSULTAR
+    </button>
+
+    <div class="stats-box">
+        <label style="margin-bottom: 10px;">Resumen Estadístico</label>
+        <div class="stat-line"><span>N° Madres:</span> <b id="stat-madres">0</b></div>
+        <div class="stat-line"><span>N° Niños:</span> <b id="stat-ninos">0</b></div>
+        <div class="stat-line"><span>N° Anémicos:</span> <b id="stat-anemicos" class="stat-danger">0</b></div>
+        <hr style="border:0; border-top:1px solid #e2e8f0; margin: 8px 0;">
+        <div class="stat-line"><span>Inas. Anemia:</span> <b id="stat-ina-anemia">0</b></div>
+        <div class="stat-line"><span>Inas. CRED:</span> <b id="stat-ina-cred">0</b></div>
+        <div class="stat-line"><span>Inas. Vacuna:</span> <b id="stat-ina-vacuna">0</b></div>
+    </div>
+    
+    <div id="stats" style="margin-top:15px; font-size:0.7rem; text-align:center; color:#94a3b8;">
+        Esperando conexión...
+    </div>
+</div>
+
+<button class="toggle-btn" onclick="togglePanel()"><i class="fas fa-bars"></i></button>
+
+<div id="map"></div>
+
+<script>
+    const URL_API = "https://script.google.com/macros/s/AKfycbzNPmSm-pST9T9oNWfTRk3EBf2GXj3VVnAyANSuNaWwf7MKzHjV5Vf1qR3T0fmvTN3r/exec"; 
+    
+    const map = L.map('map', { center: [-9.2938, -75.9926], zoom: 15, zoomControl: false });
+    L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}').addTo(map);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    let markersLayer = L.layerGroup().addTo(map);
+    let rawData = [];
+    let activeFilters = { anemia: false, cred: false, vacuna: false, soloAnemia: false };
+    let routingControl = null;
+    let watchId = null;
+
+    // --- NUEVAS FUNCIONES DE NAVEGACIÓN MEJORADA ---
+    function iniciarNavegacion(latDestino, lngDestino, nombreMadre) {
+        if (!navigator.geolocation) {
+            alert("Tu navegador no soporta geolocalización");
+            return;
+        }
+
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        hablar(`Iniciando ruta hacia la casa de la señora ${nombreMadre}.`);
+
+        watchId = navigator.geolocation.watchPosition((pos) => {
+            const latOrigen = pos.coords.latitude;
+            const lngOrigen = pos.coords.longitude;
+
+            if (routingControl) map.removeControl(routingControl);
+
+            routingControl = L.Routing.control({
+                waypoints: [L.latLng(latOrigen, lngOrigen), L.latLng(latDestino, lngDestino)],
+                language: 'es',
+                router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+                lineOptions: { styles: [{ color: '#2563eb', weight: 8, opacity: 0.8 }] },
+                fitSelectedRoutes: true,
+                createMarker: function() { return null; }
+            }).addTo(map);
+
+            routingControl.on('routesfound', function(e) {
+                const route = e.routes[0];
+                const dist = route.summary.totalDistance;
+                const instructions = route.instructions[0];
+
+                if (dist < 15) {
+                    hablar(`Has llegado a la casa de la señora ${nombreMadre}.`);
+                    navigator.geolocation.clearWatch(watchId);
+                } else if (instructions && instructions.distance < 20) {
+                    hablar(`En 20 metros, ${instructions.text}`);
+                }
+            });
+
+        }, () => alert("GPS desactivado."), { enableHighAccuracy: true });
+    }
+
+    // REGISTRO DE VISITA AUTOMÁTICO
+    async function registrarVisita(nombreMadre, nombreHijo) {
+        const btn = event.target;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registrando...';
+        
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const coords = `${pos.coords.latitude},${pos.coords.longitude}`;
+            const data = {
+                action: "registrarVisita", // Asegúrate de manejar esta acción en tu .gs
+                madre: nombreMadre,
+                hijo: nombreHijo,
+                ubicacion: coords,
+                fecha: new Date().toLocaleString()
+            };
+
+            try {
+                // Enviamos los datos al mismo script de Google Sheets
+                await fetch(URL_API, {
+                    method: 'POST',
+                    mode: 'no-cors', // Necesario para Google Apps Script
+                    body: JSON.stringify(data)
+                });
+                btn.style.background = "#22c55e";
+                btn.innerText = "¡VISITA REGISTRADA!";
+                hablar(`Visita de ${nombreHijo} registrada correctamente.`);
+            } catch (e) {
+                btn.innerText = "ERROR AL REGISTRAR";
+            }
+        });
+    }
+
+    function hablar(texto) {
+        window.speechSynthesis.cancel(); // Detiene voces anteriores
+        const utterance = new SpeechSynthesisUtterance(texto);
+        utterance.lang = 'es-PE';
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function togglePanel() { document.getElementById('sidePanel').classList.toggle('hidden'); }
+
+    function parseDate(val) {
+        if (!val || String(val).includes("#") || String(val).trim() === "" || val === 0 || val === "0") return null;
+        if (!isNaN(val) && typeof val === 'number') return new Date((val - 25569) * 86400 * 1000);
+        let s = String(val).trim();
+        let parts = s.split(/[\/\-]/);
+        if (parts.length === 3) {
+            let d, m, a;
+            if (parts[0].length === 4) { a = parseInt(parts[0]); m = parseInt(parts[1]) - 1; d = parseInt(parts[2]); }
+            else { d = parseInt(parts[0]); m = parseInt(parts[1]) - 1; a = parseInt(parts[2]); }
+            if (a < 100) a += 2000;
+            return new Date(a, m, d, 12, 0, 0);
+        }
+        let dObj = new Date(s);
+        return isNaN(dObj.getTime()) ? null : dObj;
+    }
+
+    function calcularEdad(fechaNacStr) {
+        const f = parseDate(fechaNacStr);
+        if (!f) return "S/D";
+        const hoy = new Date();
+        let anios = hoy.getFullYear() - f.getFullYear();
+        let meses = hoy.getMonth() - f.getMonth();
+        let dias = hoy.getDate() - f.getDate();
+        if (dias < 0) { meses--; let ultDia = new Date(hoy.getFullYear(), hoy.getMonth(), 0).getDate(); dias += ultDia; }
+        if (meses < 0) { anios--; meses += 12; }
+        return `${anios > 0 ? anios + "a " : ""}${meses}m ${dias}d`;
+    }
+
+    async function fetchData() {
+        document.getElementById('stats').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sincronizando...';
+        try {
+            const response = await fetch(URL_API);
+            rawData = await response.json();
+            applyFilters();
+        } catch (e) { document.getElementById('stats').innerText = "Error de conexión."; }
+    }
+
+    function toggleFilter(type) {
+        activeFilters[type] = !activeFilters[type];
+        const btn = document.getElementById('btn-' + type);
+        if (type === 'soloAnemia') btn.classList.toggle('active-anemia');
+        else btn.classList.toggle('active');
+        applyFilters();
+    }
+
+    function resetFilters() {
+        activeFilters = { anemia: false, cred: false, vacuna: false, soloAnemia: false };
+        document.querySelectorAll('.btn-quick').forEach(b => {
+            b.classList.remove('active');
+            b.classList.remove('active-anemia');
+        });
+        document.getElementById('mainSearch').value = '';
+        document.getElementById('dateStart').value = '';
+        document.getElementById('dateEnd').value = '';
+        if (routingControl) map.removeControl(routingControl);
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        applyFilters();
+    }
+
+    function applyFilters() {
+        markersLayer.clearLayers();
+        const term = document.getElementById('mainSearch').value.toLowerCase().trim();
+        const dStart = document.getElementById('dateStart').value ? new Date(document.getElementById('dateStart').value + "T00:00:00") : null;
+        const dEnd = document.getElementById('dateEnd').value ? new Date(document.getElementById('dateEnd').value + "T23:59:59") : null;
+
+        const grupos = {};
+        let contNinos = 0; let contAnemicos = 0; let contInaAnemia = 0; let contInaCred = 0; let contInaVacuna = 0;
+        const setMadres = new Set();
+
+        rawData.forEach(item => {
+            const fNac = parseDate(item.nacimientoHijo);
+            if (dStart && fNac && fNac < dStart) return;
+            if (dEnd && fNac && fNac > dEnd) return;
+
+            const matchSearch = !term || String(item.dniHijo).includes(term) || item.nombreHijo.toLowerCase().includes(term) || item.nombreMadre.toLowerCase().includes(term);
+            if (!matchSearch) return;
+
+            const esAnemicoReal = (item.anemia && String(item.anemia).trim() !== "" && String(item.anemia).trim() !== "0" && !String(item.anemia).includes("#")) || item.fechaInicioAnemia;
+
+            if (activeFilters.soloAnemia && !esAnemicoReal) return;
+            if (activeFilters.anemia && !item.citaFaltante) return;
+            if (activeFilters.cred && !item.citaCred) return; 
+            if (activeFilters.vacuna && !item.citaVacuna) return;
+
+            contNinos++;
+            setMadres.add(item.nombreMadre);
+            if (esAnemicoReal) contAnemicos++;
+            if (item.citaFaltante) contInaAnemia++;
+            if (item.citaCred) contInaCred++;
+            if (item.citaVacuna) contInaVacuna++;
+
+            if (!grupos[item.coords]) grupos[item.coords] = [];
+            grupos[item.coords].push(item);
+        });
+
+        document.getElementById('stat-madres').innerText = setMadres.size;
+        document.getElementById('stat-ninos').innerText = contNinos;
+        document.getElementById('stat-anemicos').innerText = contAnemicos;
+        document.getElementById('stat-ina-anemia').innerText = contInaAnemia;
+        document.getElementById('stat-ina-cred').innerText = contInaCred;
+        document.getElementById('stat-ina-vacuna').innerText = contInaVacuna;
+
+        for (const coord in grupos) {
+            const personas = grupos[coord];
+            const latlng = coord.split(",").map(Number);
+            const tieneAlerta = personas.some(p => {
+                const esAnemico = (p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0" && !String(p.anemia).includes("#")) || p.fechaInicioAnemia;
+                return esAnemico || p.citaFaltante || p.citaCred || p.citaVacuna;
+            });
+
+            const tel = String(personas[0].celular || "").replace(/\D/g, "");
+            const waLink = `https://wa.me/51${tel}?text=Hola%20${encodeURIComponent(personas[0].nombreMadre)},%20le%20escribimos%20del%20Centro%20Salud%20Castillo%20Grande...`;
+
+            let html = `<div class="popup-container">
+                <div class="header-vivienda">
+                    <small>RESPONSABLE</small>
+                    <b>${personas[0].nombreMadre}</b>
+                    <div class="info-row"><i class="fas fa-phone"></i> Cel: ${personas[0].celular || 'S/N'}</div>
+                    <div class="info-row"><i class="fas fa-home"></i> ${personas[0].domicilio || 'S/D'}</div>
+                    <div class="contact-actions">
+                        <a href="${waLink}" target="_blank" class="btn-contact btn-whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+                        <a href="tel:${tel}" class="btn-contact btn-phone"><i class="fas fa-phone-alt"></i> Llamar</a>
+                        <button onclick="iniciarNavegacion(${latlng[0]}, ${latlng[1]}, '${personas[0].nombreMadre.replace(/'/g, "")}')" class="btn-contact btn-route">
+                            <i class="fas fa-route"></i> ¿CÓMO LLEGAR?
+                        </button>
+                    </div>
+                </div>`;
+
+            personas.forEach(p => {
+                const esAnemico = (p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0" && !String(p.anemia).includes("#")) || p.fechaInicioAnemia;
+                let badgesHtml = "";
+                if (esAnemico) {
+                    badgesHtml += `<div class="status-badge bg-red bg-anemia-total"><i class="fas fa-tint"></i> NIÑO ANÉMICO</div>`;
+                }
+                if (p.citaFaltante) badgesHtml += `<div class="status-badge bg-orange"><i class="fas fa-calendar-times"></i> INAS. ANEMIA: ${p.citaFaltante}</div>`;
+                if (p.citaCred) badgesHtml += `<div class="status-badge bg-orange" style="border-color:#3b82f6"><i class="fas fa-baby"></i> INAS. CRED: ${p.citaCred}</div>`;
+                
+                html += `<div class="child-card ${esAnemico ? 'anemia-alert' : ''}">
+                    <span style="font-weight:600;">👶 ${p.nombreHijo}</span>
+                    <div class="info-row">${calcularEdad(p.nacimientoHijo)}</div>
+                    ${badgesHtml}
+                    <button class="btn-register" onclick="registrarVisita('${p.nombreMadre}', '${p.nombreHijo}')">
+                        <i class="fas fa-check-circle"></i> REGISTRAR VISITA
+                    </button>
+                </div>`;
+            });
+
+            L.marker(latlng, { icon: new L.Icon({
+                iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${tieneAlerta ? 'red' : 'blue'}.png`,
+                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
+            })}).bindPopup(html + "</div>").addTo(markersLayer);
+        }
+    }
+    fetchData();
+</script>
+</body>
+</html>
