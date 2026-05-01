@@ -115,13 +115,6 @@
         .btn-phone { background: #3b82f6; }
         .btn-route { background: #1e293b; color: white !important; grid-column: span 2; margin-top: 5px; }
 
-        /* Estilo para botón de registro */
-        .btn-register {
-            width: 100%; margin-top: 8px; background: #059669; color: white !important;
-            border: none; padding: 6px; border-radius: 6px; font-size: 0.65rem;
-            cursor: pointer; font-weight: 600;
-        }
-
         .leaflet-routing-container { display: none; }
     </style>
 </head>
@@ -180,12 +173,15 @@
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     let markersLayer = L.layerGroup().addTo(map);
+    // Marcador visual para la posición del usuario (el círculo azul que se mueve)
+    let userMarker = L.circleMarker([0,0], { radius: 8, color: 'white', fillColor: '#2563eb', fillOpacity: 1, weight: 3 }).addTo(map);
+    
     let rawData = [];
     let activeFilters = { anemia: false, cred: false, vacuna: false, soloAnemia: false };
     let routingControl = null;
     let watchId = null;
 
-    // --- NUEVAS FUNCIONES DE NAVEGACIÓN MEJORADA ---
+    // --- NAVEGACIÓN GPS MEJORADA ---
     function iniciarNavegacion(latDestino, lngDestino, nombreMadre) {
         if (!navigator.geolocation) {
             alert("Tu navegador no soporta geolocalización");
@@ -193,20 +189,30 @@
         }
 
         if (watchId) navigator.geolocation.clearWatch(watchId);
-        hablar(`Iniciando ruta hacia la casa de la señora ${nombreMadre}.`);
+        hablar(`Calculando ruta hacia la casa de la señora ${nombreMadre}.`);
 
+        // WatchPosition con máxima precisión para seguir el movimiento real
         watchId = navigator.geolocation.watchPosition((pos) => {
             const latOrigen = pos.coords.latitude;
             const lngOrigen = pos.coords.longitude;
+
+            // Actualizar el círculo azul de posición del usuario
+            userMarker.setLatLng([latOrigen, lngOrigen]);
 
             if (routingControl) map.removeControl(routingControl);
 
             routingControl = L.Routing.control({
                 waypoints: [L.latLng(latOrigen, lngOrigen), L.latLng(latDestino, lngDestino)],
-                language: 'es',
-                router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-                lineOptions: { styles: [{ color: '#2563eb', weight: 8, opacity: 0.8 }] },
+                router: L.Routing.osrmv1({ 
+                    serviceUrl: 'https://router.project-osrm.org/route/v1',
+                    profile: 'foot' // Perfil de caminata para mayor precisión en calles pequeñas
+                }),
+                lineOptions: { 
+                    styles: [{ color: '#2563eb', weight: 8, opacity: 0.8 }],
+                    addWaypoints: false 
+                },
                 fitSelectedRoutes: true,
+                show: false,
                 createMarker: function() { return null; }
             }).addTo(map);
 
@@ -216,55 +222,32 @@
                 const instructions = route.instructions[0];
 
                 if (dist < 15) {
-                    hablar(`Has llegado a la casa de la señora ${nombreMadre}.`);
+                    hablar(`Has llegado al destino.`);
                     navigator.geolocation.clearWatch(watchId);
-                } else if (instructions && instructions.distance < 20) {
-                    hablar(`En 20 metros, ${instructions.text}`);
+                    if (routingControl) map.removeControl(routingControl);
+                } else if (instructions && instructions.distance < 15) {
+                    hablar(instructions.text); // Indica giros en tiempo real
                 }
             });
 
-        }, () => alert("GPS desactivado."), { enableHighAccuracy: true });
-    }
-
-    // REGISTRO DE VISITA AUTOMÁTICO
-    async function registrarVisita(nombreMadre, nombreHijo) {
-        const btn = event.target;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registrando...';
-        
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            const coords = `${pos.coords.latitude},${pos.coords.longitude}`;
-            const data = {
-                action: "registrarVisita", // Asegúrate de manejar esta acción en tu .gs
-                madre: nombreMadre,
-                hijo: nombreHijo,
-                ubicacion: coords,
-                fecha: new Date().toLocaleString()
-            };
-
-            try {
-                // Enviamos los datos al mismo script de Google Sheets
-                await fetch(URL_API, {
-                    method: 'POST',
-                    mode: 'no-cors', // Necesario para Google Apps Script
-                    body: JSON.stringify(data)
-                });
-                btn.style.background = "#22c55e";
-                btn.innerText = "¡VISITA REGISTRADA!";
-                hablar(`Visita de ${nombreHijo} registrada correctamente.`);
-            } catch (e) {
-                btn.innerText = "ERROR AL REGISTRAR";
-            }
+        }, (err) => {
+            alert("Error de GPS: Asegúrate de tener la ubicación activada.");
+        }, { 
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 10000 
         });
     }
 
     function hablar(texto) {
-        window.speechSynthesis.cancel(); // Detiene voces anteriores
+        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(texto);
         utterance.lang = 'es-PE';
-        utterance.rate = 0.9;
+        utterance.rate = 1.0;
         window.speechSynthesis.speak(utterance);
     }
 
+    // --- FUNCIONES DE SOPORTE Y FILTROS ---
     function togglePanel() { document.getElementById('sidePanel').classList.toggle('hidden'); }
 
     function parseDate(val) {
@@ -315,8 +298,7 @@
     function resetFilters() {
         activeFilters = { anemia: false, cred: false, vacuna: false, soloAnemia: false };
         document.querySelectorAll('.btn-quick').forEach(b => {
-            b.classList.remove('active');
-            b.classList.remove('active-anemia');
+            b.classList.remove('active', 'active-anemia');
         });
         document.getElementById('mainSearch').value = '';
         document.getElementById('dateStart').value = '';
@@ -398,9 +380,7 @@
             personas.forEach(p => {
                 const esAnemico = (p.anemia && String(p.anemia).trim() !== "" && String(p.anemia).trim() !== "0" && !String(p.anemia).includes("#")) || p.fechaInicioAnemia;
                 let badgesHtml = "";
-                if (esAnemico) {
-                    badgesHtml += `<div class="status-badge bg-red bg-anemia-total"><i class="fas fa-tint"></i> NIÑO ANÉMICO</div>`;
-                }
+                if (esAnemico) badgesHtml += `<div class="status-badge bg-red bg-anemia-total"><i class="fas fa-tint"></i> NIÑO ANÉMICO</div>`;
                 if (p.citaFaltante) badgesHtml += `<div class="status-badge bg-orange"><i class="fas fa-calendar-times"></i> INAS. ANEMIA: ${p.citaFaltante}</div>`;
                 if (p.citaCred) badgesHtml += `<div class="status-badge bg-orange" style="border-color:#3b82f6"><i class="fas fa-baby"></i> INAS. CRED: ${p.citaCred}</div>`;
                 
@@ -408,9 +388,6 @@
                     <span style="font-weight:600;">👶 ${p.nombreHijo}</span>
                     <div class="info-row">${calcularEdad(p.nacimientoHijo)}</div>
                     ${badgesHtml}
-                    <button class="btn-register" onclick="registrarVisita('${p.nombreMadre}', '${p.nombreHijo}')">
-                        <i class="fas fa-check-circle"></i> REGISTRAR VISITA
-                    </button>
                 </div>`;
             });
 
