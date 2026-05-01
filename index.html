@@ -115,6 +115,12 @@
         .btn-phone { background: #3b82f6; }
         .btn-route { background: #1e293b; color: white !important; grid-column: span 2; margin-top: 5px; }
 
+        .btn-register {
+            width: 100%; margin-top: 8px; background: #059669; color: white !important;
+            border: none; padding: 6px; border-radius: 6px; font-size: 0.65rem;
+            cursor: pointer; font-weight: 600;
+        }
+
         .leaflet-routing-container { display: none; }
     </style>
 </head>
@@ -173,7 +179,6 @@
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     let markersLayer = L.layerGroup().addTo(map);
-    // Marcador visual para la posición del usuario (el círculo azul que se mueve)
     let userMarker = L.circleMarker([0,0], { radius: 8, color: 'white', fillColor: '#2563eb', fillOpacity: 1, weight: 3 }).addTo(map);
     
     let rawData = [];
@@ -181,7 +186,7 @@
     let routingControl = null;
     let watchId = null;
 
-    // --- NAVEGACIÓN GPS MEJORADA ---
+    // --- NAVEGACIÓN GPS MEJORADA CON VOZ ---
     function iniciarNavegacion(latDestino, lngDestino, nombreMadre) {
         if (!navigator.geolocation) {
             alert("Tu navegador no soporta geolocalización");
@@ -189,28 +194,20 @@
         }
 
         if (watchId) navigator.geolocation.clearWatch(watchId);
-        hablar(`Calculando ruta hacia la casa de la señora ${nombreMadre}.`);
+        hablar(`Iniciando seguimiento hacia la casa de la señora ${nombreMadre}.`);
 
-        // WatchPosition con máxima precisión para seguir el movimiento real
         watchId = navigator.geolocation.watchPosition((pos) => {
             const latOrigen = pos.coords.latitude;
             const lngOrigen = pos.coords.longitude;
 
-            // Actualizar el círculo azul de posición del usuario
             userMarker.setLatLng([latOrigen, lngOrigen]);
 
             if (routingControl) map.removeControl(routingControl);
 
             routingControl = L.Routing.control({
                 waypoints: [L.latLng(latOrigen, lngOrigen), L.latLng(latDestino, lngDestino)],
-                router: L.Routing.osrmv1({ 
-                    serviceUrl: 'https://router.project-osrm.org/route/v1',
-                    profile: 'foot' // Perfil de caminata para mayor precisión en calles pequeñas
-                }),
-                lineOptions: { 
-                    styles: [{ color: '#2563eb', weight: 8, opacity: 0.8 }],
-                    addWaypoints: false 
-                },
+                router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'foot' }),
+                lineOptions: { styles: [{ color: '#2563eb', weight: 8, opacity: 0.8 }] },
                 fitSelectedRoutes: true,
                 show: false,
                 createMarker: function() { return null; }
@@ -222,20 +219,45 @@
                 const instructions = route.instructions[0];
 
                 if (dist < 15) {
-                    hablar(`Has llegado al destino.`);
+                    hablar(`Has llegado a la casa de la señora ${nombreMadre}.`);
                     navigator.geolocation.clearWatch(watchId);
-                    if (routingControl) map.removeControl(routingControl);
-                } else if (instructions && instructions.distance < 15) {
-                    hablar(instructions.text); // Indica giros en tiempo real
+                } else if (instructions && instructions.distance < 20) {
+                    hablar(instructions.text);
                 }
             });
 
-        }, (err) => {
-            alert("Error de GPS: Asegúrate de tener la ubicación activada.");
-        }, { 
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 10000 
+        }, () => alert("Error de GPS."), { enableHighAccuracy: true, maximumAge: 0 });
+    }
+
+    // --- REGISTRO DE VISITA RESTAURADO ---
+    async function registrarVisita(nombreMadre, nombreHijo) {
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registrando...';
+        
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const coords = `${pos.coords.latitude},${pos.coords.longitude}`;
+            const data = {
+                action: "registrarVisita",
+                madre: nombreMadre,
+                hijo: nombreHijo,
+                ubicacion: coords,
+                fecha: new Date().toLocaleString()
+            };
+
+            try {
+                await fetch(URL_API, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify(data)
+                });
+                btn.style.background = "#22c55e";
+                btn.innerText = "¡VISITA REGISTRADA!";
+                hablar(`Visita de ${nombreHijo} registrada.`);
+            } catch (e) {
+                btn.innerText = "ERROR AL REGISTRAR";
+                setTimeout(() => btn.innerHTML = originalText, 3000);
+            }
         });
     }
 
@@ -243,11 +265,10 @@
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(texto);
         utterance.lang = 'es-PE';
-        utterance.rate = 1.0;
+        utterance.rate = 0.9;
         window.speechSynthesis.speak(utterance);
     }
 
-    // --- FUNCIONES DE SOPORTE Y FILTROS ---
     function togglePanel() { document.getElementById('sidePanel').classList.toggle('hidden'); }
 
     function parseDate(val) {
@@ -388,6 +409,9 @@
                     <span style="font-weight:600;">👶 ${p.nombreHijo}</span>
                     <div class="info-row">${calcularEdad(p.nacimientoHijo)}</div>
                     ${badgesHtml}
+                    <button class="btn-register" onclick="registrarVisita('${p.nombreMadre}', '${p.nombreHijo}')">
+                        <i class="fas fa-check-circle"></i> REGISTRAR VISITA
+                    </button>
                 </div>`;
             });
 
